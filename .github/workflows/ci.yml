@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm --prefix backend ci
+      - run: npm --prefix frontend ci
+      - run: npm --prefix backend run typecheck
+      - run: npm --prefix frontend run build
+      - run: npm run test:migration-fixture
+      - run: npm run smoke:seed
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

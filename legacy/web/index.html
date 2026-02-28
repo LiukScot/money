@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>myMoney – investments dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <link rel="stylesheet" href="/shared/base.css?v=20241221-24">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="mm-app">
+  <div class="container py-3">
+    <header class="d-flex align-items-center gap-3 mb-3">
+      <div class="d-inline-flex align-items-center gap-2">
+        <span class="logo">💸</span>
+        <div>
+          <div class="fs-3 fw-bold mb-0">myMoney</div>
+          <div class="text-muted">Manage money, investments, movements, and growth</div>
+        </div>
+      </div>
+    </header>
+
+    <div id="app-main" class="hidden">
+      <div class="row g-3 mb-3">
+        <div class="col-12">
+          <div class="d-flex flex-wrap gap-3 align-content-start">
+            <button class="btn btn-outline-primary mm-nav__btn active" data-page="dashboard">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 13h6V4H4v9zm10 7h6V4h-6v16z" />
+            </svg>
+            dashboard
+          </button>
+            <button class="btn btn-outline-secondary mm-nav__btn" data-page="monthly-review">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 5h14v14H5V5zm0 4h14" />
+              <path d="M9 3v4M15 3v4" />
+            </svg>
+            monthly review
+          </button>
+            <button class="btn btn-outline-secondary mm-nav__btn" data-page="monthly-movements">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 9h9l-2-2m2 8H7l2 2" />
+              <path d="M5 5h14v14H5z" />
+            </svg>
+            monthly movements
+          </button>
+            <button class="btn btn-outline-secondary mm-nav__btn" data-page="transactions">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16M4 12h10M4 17h7" />
+            </svg>
+            transactions
+          </button>
+            <button class="btn btn-outline-secondary mm-nav__btn" data-page="import-backup">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 16V4m0 0l-3 3m3-3l3 3" />
+              <path d="M6 13v5h12v-5" />
+            </svg>
+            import / backup
+          </button>
+            <button class="btn btn-outline-secondary mm-nav__btn hidden" id="go-hub" type="button" aria-label="Back to hub">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M15 5l-7 7 7 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span>Back to hub</span>
+          </button>
+            <button class="btn btn-outline-danger mm-nav__btn hidden" id="auth-logout" type="button">Log out</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <section id="page-dashboard" class="page active">
+        <div class="card">
+          <div class="dash-top-row">
+            <div class="dash-metrics">
+              <h2><strong>Dashboard</strong></h2>
+              <div class="dash-grid">
+                <div class="dash-card">
+                  <div class="dash-emoji" aria-hidden="true">💰</div>
+                  <div class="dash-meta">
+                    <div class="dash-label">total invested</div>
+                    <div class="dash-value"><span id="totalInvested">-</span></div>
+                  </div>
+                </div>
+                <div class="dash-card">
+                  <div class="dash-emoji" aria-hidden="true">📈</div>
+                  <div class="dash-meta">
+                    <div class="dash-label">total PnL</div>
+                    <div class="dash-value"><span id="totalPnl">-</span></div>
+                  </div>
+                </div>
+                <div class="dash-card">
+                  <div class="dash-emoji" aria-hidden="true">📦</div>
+                  <div class="dash-meta">
+                    <div class="dash-label">different assets</div>
+                    <div class="dash-value"><span id="assetCount">-</span></div>
+                  </div>
+                </div>
+                <div class="dash-card">
+                  <div class="dash-emoji" aria-hidden="true">🧾</div>
+                  <div class="dash-meta">
+                    <div class="dash-label">transactions count</div>
+                    <div class="dash-value"><span id="txCount">-</span></div>
+                  </div>
+                </div>
+                <div class="dash-card">
+                  <div class="dash-emoji" aria-hidden="true">🕒</div>
+                  <div class="dash-meta">
+                    <div class="dash-label">last transaction</div>
+                    <div class="dash-value"><span id="lastTxDate">-</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="dash-charts">
+              <div class="charts-row">
+                <div class="chart-card canvas-small">
+                  <h4>allocazione per asset</h4>
+                  <canvas id="assetAllocationChart" height="220"></canvas>
+                </div>
+                <div class="chart-card canvas-large">
+                  <h4>PnL per asset</h4>
+                  <canvas id="assetPnlChart" height="280"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <h3>asset details</h3>
+          <button id="toggleZeroAssetsButton" type="button" class="toggle-switch">
+            <span class="indicator" aria-hidden="true"></span>
+            <span class="label">closed investments · hidden</span>
+          </button>
+          <div id="assetBlocks" class="asset-blocks"></div>
+        </div>
+      </section>
+
+      <!-- MONTHLY REVIEW -->
+      <section id="page-monthly-review" class="page">
+        <div class="card">
+          <div class="heading-row">
+            <h2><strong>Monthly review</strong></h2>
+          </div>
+
+          <div class="form-grid mm-form-grid mb-28">
+            <div class="form-card mm-form-card">
+              <div class="field-group mm-field-group">
+                <label><strong>current liquidity (quick snapshot)</strong></label>
+                <div class="flex-row-gap-8 mt-6">
+                  <input type="number" step="0.01" id="quickLiquidityInput" class="flex-1" placeholder="0.00" />
+                  <button type="button" id="addTodaySnapshotButton"
+                    class="mm-btn-primary mm-btn-plain no-top-margin no-wrap">➕ add</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-card mm-form-card">
+              <div class="field-group mm-field-group">
+                <label><span class="small-text faded-85">filter by date</span></label>
+                <div class="mm-quick-filters mt-6">
+                  <button class="mm-quick-btn active" data-range="all" type="button">since beginning</button>
+                  <button class="mm-quick-btn" data-range="3m" type="button">3 months</button>
+                  <button class="mm-quick-btn" data-range="6m" type="button">6 months</button>
+                  <button class="mm-quick-btn" data-range="1y" type="button">1 year</button>
+                  <button class="mm-quick-btn" data-range="3y" type="button">3 years</button>
+                  <button class="mm-quick-btn" data-range="10y" type="button">10 years</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="small-text mb-16">
+            add a new chart column dated today using your current assets (grouped by their risk tags) and the liquidity
+            you enter here.
+          </p>
+
+          <div id="monthlySummary" class="small-text">
+            loaded from <code>monthlySnapshots</code> (xlsx) – no data yet.
+          </div>
+          <div class="monthly-chart-box">
+            <canvas id="monthlyRiskChart" height="200"></canvas>
+          </div>
+
+          <div class="divider mt-20 mb-12"></div>
+          <h3 class="mt-0"><strong>Snapshots</strong></h3>
+          <div class="list-wrap">
+            <div class="table-scroll mm-table-scroll">
+              <table class="mm-table" id="monthlySnapshotsTable">
+                <thead>
+                  <tr>
+                    <th>date</th>
+                    <th>low</th>
+                    <th>medium</th>
+                    <th>high</th>
+                    <th>liquid</th>
+                    <th>total</th>
+                    <th>actions</th>
+                  </tr>
+                </thead>
+                <tbody id="monthlySnapshotsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MONTHLY MOVEMENTS -->
+      <section id="page-monthly-movements" class="page">
+        <div class="card">
+          <h2><strong>Monthly Movements</strong></h2>
+          <div>📥 monthly income: <span id="mmIncome">-</span></div>
+          <div>📤 monthly expenses: <span id="mmExpense">-</span></div>
+          <div>⚖️ monthly net: <span id="mmNet">-</span></div>
+
+          <form id="monthlyForm" class="mt-14">
+            <div class="form-grid mm-form-grid">
+              <div class="form-card mm-form-card">
+                <div class="field-group mm-field-group">
+                  <label><strong>name</strong></label><br>
+                  <input type="text" name="name" required />
+                </div>
+              </div>
+              <div class="form-card mm-form-card">
+                <div class="field-group mm-field-group">
+                  <label><strong>type</strong></label><br>
+                  <select name="direction" id="monthlyDirection">
+                    <option value="income">income</option>
+                    <option value="expense">expense</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-card mm-form-card">
+                <div class="field-group mm-field-group">
+                  <label><strong>monthly amount</strong></label><br>
+                  <input type="number" step="0.01" name="amount" required />
+                </div>
+              </div>
+              <div class="form-card mm-form-card">
+                <div class="field-group mm-field-group">
+                  <label><strong>note</strong></label><br>
+                  <input type="text" name="note" />
+                </div>
+              </div>
+            </div>
+            <button type="submit" id="monthlySubmitButton" class="mm-btn-primary mm-btn-plain mt-28">💾
+              save</button>
+            <button type="button" id="monthlyCancelEditButton" class="mm-btn-accent ml-8-half" style="display:none;">↩️
+              cancel</button>
+          </form>
+          <p class="small-text mt-14">
+            monthly movements <strong>do not affect</strong> the total invested: they are only a monthly income/expense
+            recap 💡
+          </p>
+        </div>
+
+        <div class="card">
+          <h3>Movements List <span id="mmCount" class="counter-subtle ml-8"></span>
+          </h3>
+          <div class="list-wrap">
+            <div class="table-scroll mm-table-scroll">
+              <table class="mm-table" id="monthlyMovementsTable">
+                <thead>
+                  <tr>
+                    <th data-mm-column="name">name <span class="sort-indicator"></span></th>
+                    <th data-mm-column="direction">type <span class="sort-indicator"></span></th>
+                    <th data-mm-column="amount">amount <span class="sort-indicator"></span></th>
+                    <th data-mm-column="note">note <span class="sort-indicator"></span></th>
+                    <th>actions</th>
+                  </tr>
+                </thead>
+                <tbody id="monthlyMovementsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TRANSACTIONS -->
+      <section id="page-transactions" class="page">
+        <div class="card">
+          <h2><strong>New Transaction</strong></h2>
+          <form id="addForm">
+            <div class="form-grid mm-form-grid">
+              <div class="form-card mm-form-card">
+                <div class="field-group mm-field-group">
+                  <label><strong>date</strong></label><br>
+                  <input type="date" name="date" required />
+                </div>
+              </div>
+
+              <div class="form-card mm-form-card">
+                <div class="field-group mm-field-group">
+                  <label><strong>asset</strong></label><br>
+                  <input type="text" name="asset" placeholder="cherrybank" required />
+                </div>
+              </div>
+
+              <div class="form-card mm-form-card">
+                <div class="field-group mm-field-group">
+                  <label><strong>type (description)</strong></label><br>
+                  <select name="tipo" id="tipoSelect">
+                    <option value="nuovo vincolo">new deposit</option>
+                    <option value="cedola">coupon</option>
+                    <option value="interessi">interest</option>
+                    <option value="cashback">cashback</option>
+                    <option value="Variazione Valore">value change</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-card mm-form-card" id="groupBuy">
+                <div class="field-group mm-field-group">
+                  <label><strong>purchase value</strong></label><br>
+                  <input type="number" step="1" name="buyValue" />
+                </div>
+              </div>
+
+              <div class="form-card mm-form-card" id="groupPnl">
+                <div class="field-group mm-field-group">
+                  <label><strong>pnl</strong></label><br>
+                  <input type="number" step="1" name="pnl" />
+                </div>
+              </div>
+
+              <div class="form-card mm-form-card">
+                <div class="field-group mm-field-group">
+                  <label><strong>note</strong></label><br>
+                  <input type="text" name="note" />
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" id="txSubmitButton" class="mm-btn-primary mm-btn-plain mt-28">💾
+              save</button>
+            <button type="button" id="txCancelEditButton" class="mm-btn-accent ml-8-half" style="display:none;">↩️
+              cancel</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2><strong>Transactions</strong> <span id="txCountHeader" class="counter-subtle ml-8"></span></h2>
+          <div class="list-wrap">
+            <div class="table-scroll mm-table-scroll">
+              <table class="mm-table" id="transactionsTable">
+                <thead>
+                  <tr>
+                    <th data-column="date">date <span class="sort-indicator"></span></th>
+                    <th data-column="asset">asset <span class="sort-indicator"></span></th>
+                    <th data-column="tipo">type (raw) <span class="sort-indicator"></span></th>
+                    <th data-column="type">type <span class="sort-indicator"></span></th>
+                    <th data-column="buyValue">buy/sell <span class="sort-indicator"></span></th>
+                    <th data-column="pnl">pnl <span class="sort-indicator"></span></th>
+                    <th data-column="note">note <span class="sort-indicator"></span></th>
+                    <th>actions</th>
+                  </tr>
+                </thead>
+                <tbody id="transactionsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- IMPORT / BACKUP -->
+      <section id="page-import-backup" class="page">
+        <div class="card">
+          <h2>Import / Backup</h2>
+          <div class="mm-hint">easily import or export your data</div>
+
+            <div class="stacked-fields mm-stacked-fields">
+              <!-- JSON import/export -->
+              <div class="field-group mm-field-group group-box mm-group-box">
+                <label><strong>Import from JSON</strong></label>
+                <div class="mm-inline-row">
+                <input type="file" id="importBackupInput" accept=".json" />
+                <button class="mm-nav__btn" id="exportBackupButton">Export JSON</button>
+              </div>
+            </div>
+
+            <!-- XLSX import/export -->
+            <div class="field-group mm-field-group group-box mm-group-box">
+              <label><strong>Import from XLSX</strong></label>
+              <div class="mm-inline-row">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" />
+                <button class="mm-nav__btn" id="exportXlsxButton">Export XLSX</button>
+              </div>
+            </div>
+
+            <h3>Danger zone</h3>
+            <div class="danger-zone">
+              <button class="mm-nav__btn danger" id="fullPurgeButton">🧨 delete all data</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module" src="/mymoney/js/app.js?v=2025-03-14"></script>
+
+</body>
+
+</html>

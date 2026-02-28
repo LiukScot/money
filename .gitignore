@@ -1,0 +1,25 @@
+# environment
+.env
+**/.env
+
+# dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# build artifacts
+frontend/dist/
+backend/dist/
+coverage/
+playwright-report/
+test-results/
+
+# local state
+data/
+*.sqlite
+*.log
+
+# editor/system
+.DS_Store
+.vscode/
+.idea/

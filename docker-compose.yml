@@ -1,0 +1,16 @@
+services:
+  mymoney:
+    build: .
+    image: mymoney:local
+    container_name: mymoney
+    ports:
+      - "${HOST_PORT:-8001}:8001"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8001
+      DB_PATH: /app/data/mymoney.sqlite
+      REDIS_URL: ${REDIS_URL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8001,http://127.0.0.1:8001,http://localhost:5174,http://127.0.0.1:5174}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

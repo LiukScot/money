@@ -37,6 +37,8 @@ const redis = new Redis(env.REDIS_URL, {
   enableReadyCheck: true
 });
 
+redis.on("error", (err) => console.error("[redis] connection error:", err.message));
+
 await redis.ping();
 
 const loginSchema = z.object({
@@ -100,6 +102,11 @@ const backupImportSchema = z.object({
 
 type SessionData = { sid: string; userId: number; email: string };
 
+function setSecurityHeaders(h: Headers): void {
+  h.set("x-content-type-options", "nosniff");
+  h.set("x-frame-options", "DENY");
+}
+
 function makeError(
   code: string,
   message: string,
@@ -109,12 +116,14 @@ function makeError(
 ): Response {
   const h = headers ? new Headers(headers) : new Headers();
   h.set("content-type", "application/json");
+  setSecurityHeaders(h);
   return new Response(JSON.stringify({ error: { code, message, fields } }), { status, headers: h });
 }
 
 function makeData(data: unknown, status = 200, headers?: Headers): Response {
   const h = headers ? new Headers(headers) : new Headers();
   h.set("content-type", "application/json");
+  setSecurityHeaders(h);
   return new Response(JSON.stringify({ data }), { status, headers: h });
 }
 
@@ -160,7 +169,8 @@ async function getSession(req: Request): Promise<SessionData | null> {
   try {
     const parsed = JSON.parse(raw) as { userId: number; email: string };
     return { sid, userId: parsed.userId, email: parsed.email };
-  } catch {
+  } catch (err) {
+    console.error(`[session] failed to parse session ${sid}:`, err);
     return null;
   }
 }
@@ -395,7 +405,7 @@ async function handleApi(req: Request, url: URL, corsHeaders: Headers): Promise<
     db.query(
       `INSERT INTO monthly_movements (id, user_id, name, direction, amount, note)
        VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(id, userId, body.name, body.direction, body.amount, body.note);
+    ).run(id, userId, body.name, body.direction, body.amount, body.note ?? "");
     return makeData({ id }, 201, corsHeaders);
   }
 
@@ -864,11 +874,13 @@ const server = Bun.serve({
 
       const staticFile = resolveStaticFile(env.PUBLIC_DIR, url.pathname);
       if (staticFile) {
+        setSecurityHeaders(cors);
         return new Response(Bun.file(staticFile), { headers: cors });
       }
 
       const indexFile = path.resolve(env.PUBLIC_DIR, "index.html");
       if (fs.existsSync(indexFile)) {
+        setSecurityHeaders(cors);
         return new Response(Bun.file(indexFile), { headers: cors });
       }
 
@@ -876,12 +888,12 @@ const server = Bun.serve({
         status: 200,
         headers: cors
       });
-    } catch (err: any) {
-      console.error(err);
+    } catch (err: unknown) {
       if (err instanceof Response) {
         return err;
       }
-      return makeError("INTERNAL_ERROR", err?.message ?? "Internal server error", 500, undefined, cors);
+      console.error("[server] unhandled error:", err);
+      return makeError("INTERNAL_ERROR", "Internal server error", 500, undefined, cors);
     }
   }
 });

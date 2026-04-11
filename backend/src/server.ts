@@ -318,8 +318,8 @@ async function handleApi(req: Request, url: URL, corsHeaders: Headers): Promise<
   if (pathname === "/api/v1/auth/session" && method === "GET") {
     const session = await getSession(req);
     if (!session) return makeData({ authenticated: false }, 200, corsHeaders);
-    const user = db.query(`SELECT id, email, name FROM users WHERE id = ? LIMIT 1`).get(session.userId) as any;
-    if (!user) return makeData({ authenticated: false }, 200, corsHeaders);
+    const user = db.query(`SELECT id, email, name, disabled_at FROM users WHERE id = ? LIMIT 1`).get(session.userId) as any;
+    if (!user || user.disabled_at) return makeData({ authenticated: false }, 200, corsHeaders);
     return makeData({ authenticated: true, user: { id: user.id, email: user.email, name: user.name ?? null } }, 200, corsHeaders);
   }
 
@@ -327,8 +327,8 @@ async function handleApi(req: Request, url: URL, corsHeaders: Headers): Promise<
   if (!session) {
     return makeError("UNAUTHORIZED", "Authentication required", 401, undefined, corsHeaders);
   }
-  const me = db.query(`SELECT id, email, name FROM users WHERE id = ? LIMIT 1`).get(session.userId) as any;
-  if (!me) {
+  const me = db.query(`SELECT id, email, name, disabled_at FROM users WHERE id = ? LIMIT 1`).get(session.userId) as any;
+  if (!me || me.disabled_at) {
     return makeError("UNAUTHORIZED", "Authentication required", 401, undefined, corsHeaders);
   }
   const userId = Number(me.id);
@@ -369,7 +369,7 @@ async function handleApi(req: Request, url: URL, corsHeaders: Headers): Promise<
     return makeData({ id }, 201, corsHeaders);
   }
 
-  const txMatch = pathname.match(/^\/api\/v1\/transactions\/(.+)$/);
+  const txMatch = pathname.match(/^\/api\/v1\/transactions\/([^/]+)$/);
   if (txMatch && method === "PUT") {
     const id = txMatch[1] ?? "";
     const body = await parseJson(req, txSchema);
@@ -409,7 +409,7 @@ async function handleApi(req: Request, url: URL, corsHeaders: Headers): Promise<
     return makeData({ id }, 201, corsHeaders);
   }
 
-  const mmMatch = pathname.match(/^\/api\/v1\/monthly-movements\/(.+)$/);
+  const mmMatch = pathname.match(/^\/api\/v1\/monthly-movements\/([^/]+)$/);
   if (mmMatch && method === "PUT") {
     const id = mmMatch[1] ?? "";
     const body = await parseJson(req, movementSchema);
@@ -444,7 +444,7 @@ async function handleApi(req: Request, url: URL, corsHeaders: Headers): Promise<
     return makeData({ id }, 201, corsHeaders);
   }
 
-  const snapMatch = pathname.match(/^\/api\/v1\/monthly-snapshots\/(.+)$/);
+  const snapMatch = pathname.match(/^\/api\/v1\/monthly-snapshots\/([^/]+)$/);
   if (snapMatch && method === "PUT") {
     const id = snapMatch[1] ?? "";
     const body = await parseJson(req, snapshotSchema);

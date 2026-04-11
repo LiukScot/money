@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -104,12 +104,14 @@ function App() {
     queryFn: async () => apiFetch("/api/v1/auth/session", { method: "GET" }, (raw) => sessionSchema.parse(raw).data)
   });
 
-  if (sessionQuery.data?.authenticated && sessionQuery.data.user && !user) {
-    setUser(sessionQuery.data.user);
-  }
-  if (sessionQuery.data && !sessionQuery.data.authenticated && user) {
-    setUser(null);
-  }
+  useEffect(() => {
+    if (sessionQuery.data?.authenticated && sessionQuery.data.user && !user) {
+      setUser(sessionQuery.data.user);
+    }
+    if (sessionQuery.data && !sessionQuery.data.authenticated && user) {
+      setUser(null);
+    }
+  }, [sessionQuery.data, user, setUser]);
 
   const txQuery = useQuery({
     queryKey: ["transactions"],

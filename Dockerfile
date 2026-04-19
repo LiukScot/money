@@ -8,8 +8,8 @@ RUN bun run build
 FROM oven/bun:1
 WORKDIR /app
 
-COPY backend/package.json backend/package-lock.json* ./backend/
-RUN cd backend && bun install --production
+COPY backend/package.json backend/bun.lock ./backend/
+RUN cd backend && bun install --production --frozen-lockfile
 
 COPY backend/ ./backend/
 COPY scripts/ ./scripts/

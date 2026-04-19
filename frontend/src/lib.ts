@@ -10,7 +10,7 @@ export async function apiFetch<T>(
   const res = await fetch(path, {
     credentials: "include",
     headers: {
-      ...(options.body ? { "content-type": "application/json" } : {}),
+      ...(options.body && !(options.body instanceof FormData) ? { "content-type": "application/json" } : {}),
       ...(options.headers ?? {})
     },
     ...options

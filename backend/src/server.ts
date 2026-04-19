@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import cookie from "cookie";
 import bcrypt from "bcryptjs";
-import Redis from "ioredis";
 import * as XLSX from "xlsx";
 import { z } from "zod";
 import { openDb, runMigrations } from "./db.ts";
@@ -11,10 +10,8 @@ const envSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
   PORT: z.coerce.number().default(8001),
   DB_PATH: z.string().default(path.resolve(process.cwd(), "../data/mymoney.sqlite")),
-  REDIS_URL: z.string().min(1, "REDIS_URL is required"),
   SESSION_TTL_SECONDS: z.coerce.number().default(60 * 60 * 24 * 30),
   SESSION_COOKIE_NAME: z.string().default("MYMONEY_SESSID"),
-  SESSION_PREFIX: z.string().default("mymoney:sess:"),
   ALLOWED_ORIGINS: z.string().default("http://localhost:5174,http://127.0.0.1:5174,http://localhost:8001,http://127.0.0.1:8001"),
   PUBLIC_DIR: z.string().default(path.resolve(process.cwd(), "../frontend/dist")),
   COOKIE_SECURE: z.string().default("false")
@@ -30,16 +27,7 @@ const allowedOrigins = new Set(
 fs.mkdirSync(path.dirname(env.DB_PATH), { recursive: true });
 const db = openDb(env.DB_PATH);
 runMigrations(db);
-
-const redis = new Redis(env.REDIS_URL, {
-  lazyConnect: false,
-  maxRetriesPerRequest: 1,
-  enableReadyCheck: true
-});
-
-redis.on("error", (err) => console.error("[redis] connection error:", err.message));
-
-await redis.ping();
+db.query(`DELETE FROM user_sessions WHERE expires_at <= ?`).run(Math.floor(Date.now() / 1000));
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -164,25 +152,27 @@ function readCookie(req: Request, name: string): string | null {
 async function getSession(req: Request): Promise<SessionData | null> {
   const sid = readCookie(req, env.SESSION_COOKIE_NAME);
   if (!sid) return null;
-  const raw = await redis.get(`${env.SESSION_PREFIX}${sid}`);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as { userId: number; email: string };
-    return { sid, userId: parsed.userId, email: parsed.email };
-  } catch (err) {
-    console.error(`[session] failed to parse session ${sid}:`, err);
+  const now = Math.floor(Date.now() / 1000);
+  const row = db
+    .query(`SELECT user_id, email, expires_at FROM user_sessions WHERE sid = ? LIMIT 1`)
+    .get(sid) as { user_id: number; email: string; expires_at: number } | null;
+  if (!row) return null;
+  if (Number(row.expires_at) <= now) {
+    db.query(`DELETE FROM user_sessions WHERE sid = ?`).run(sid);
     return null;
   }
+  return { sid, userId: Number(row.user_id), email: row.email };
 }
 
 async function createSession(userId: number, email: string): Promise<string> {
   const sid = crypto.randomUUID().replaceAll("-", "");
-  await redis.set(`${env.SESSION_PREFIX}${sid}`, JSON.stringify({ userId, email }), "EX", env.SESSION_TTL_SECONDS);
+  const expiresAt = Math.floor(Date.now() / 1000) + env.SESSION_TTL_SECONDS;
+  db.query(`INSERT INTO user_sessions (sid, user_id, email, expires_at) VALUES (?, ?, ?, ?)`).run(sid, userId, email, expiresAt);
   return sid;
 }
 
 async function deleteSession(sid: string): Promise<void> {
-  await redis.del(`${env.SESSION_PREFIX}${sid}`);
+  db.query(`DELETE FROM user_sessions WHERE sid = ?`).run(sid);
 }
 
 function buildSessionCookie(sid: string): string {

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const migrationStatements: string[] = [
   `CREATE TABLE IF NOT EXISTS users (
@@ -64,6 +64,14 @@ export const migrationStatements: string[] = [
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`,
+  `CREATE TABLE IF NOT EXISTS user_sessions (
+    sid TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    email TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
   `CREATE TABLE IF NOT EXISTS app_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -71,5 +79,7 @@ export const migrationStatements: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_tx_user_date ON transactions(user_id, tx_date DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_mm_user ON monthly_movements(user_id, direction)`,
   `CREATE INDEX IF NOT EXISTS idx_snap_user_date ON monthly_snapshots(user_id, snapshot_date DESC)`,
-  `CREATE INDEX IF NOT EXISTS idx_asset_style_user ON asset_styles(user_id, asset)`
+  `CREATE INDEX IF NOT EXISTS idx_asset_style_user ON asset_styles(user_id, asset)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at)`
 ];

@@ -4,9 +4,9 @@ Standalone myMoney project running on port `8001`.
 
 ## Stack
 
-- Backend: Bun + TypeScript + SQLite + Redis sessions
+- Backend: Bun + TypeScript + SQLite
 - Frontend: React + TypeScript + Vite
-- Auth: cookie sessions (`MYMONEY_SESSID`) with Redis key prefix `mymoney:sess:`
+- Auth: cookie sessions (`MYMONEY_SESSID`) persisted in SQLite
 
 ## Quick start
 
@@ -14,13 +14,11 @@ Standalone myMoney project running on port `8001`.
    - `npm install`
    - `npm --prefix backend install`
    - `npm --prefix frontend install`
-2. Set env (minimum):
-   - `REDIS_URL=redis://127.0.0.1:6379`
-3. Run migrations:
+2. Run migrations:
    - `npm run migrate`
-4. Create first user:
+3. Create first user:
    - `npm run user -- create --email=you@example.com --password='StrongPass123' --name='You'`
-5. Run backend and frontend (separate terminals):
+4. Run backend and frontend (separate terminals):
    - `npm run dev:backend`
    - `npm run dev:frontend`
 
@@ -42,7 +40,7 @@ This writes `data/mymoney-migration-report.json`.
 ## Docker
 
 - `docker compose up --build -d`
-- Requires external Redis (`REDIS_URL`).
+- No Redis service is required.
 
 ## Rollback helpers
 

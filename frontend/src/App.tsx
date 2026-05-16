@@ -341,8 +341,14 @@ function App() {
     const totalInvested = tx.reduce((sum, row) => sum + row.currentValue, 0);
     const totalPnl = tx.reduce((sum, row) => sum + row.pnl, 0);
     const assets = Array.from(new Set(tx.map((row) => row.asset)));
-    const income = mm.filter((row) => row.direction === "income").reduce((sum, row) => sum + row.amount, 0);
-    const expense = mm.filter((row) => row.direction === "expense").reduce((sum, row) => sum + row.amount, 0);
+    const { income, expense } = mm.reduce(
+      (acc, row) => {
+        if (row.direction === "income") acc.income += row.amount;
+        else acc.expense += row.amount;
+        return acc;
+      },
+      { income: 0, expense: 0 }
+    );
     return {
       totalInvested,
       totalPnl,
@@ -406,13 +412,13 @@ function App() {
           <h1>myMoney</h1>
           <p>Sign in to access your private money workspace.</p>
           <form className="stack" onSubmit={loginForm.handleSubmit((values) => loginMutation.mutate(values))}>
-            <label>
+            <label htmlFor="login-email">
               Email
-              <input type="email" {...loginForm.register("email")} />
+              <input id="login-email" type="email" autoComplete="email" {...loginForm.register("email")} />
             </label>
-            <label>
+            <label htmlFor="login-password">
               Password
-              <input type="password" {...loginForm.register("password")} />
+              <input id="login-password" type="password" autoComplete="current-password" {...loginForm.register("password")} />
             </label>
             <button type="submit" disabled={loginMutation.isPending}>{loginMutation.isPending ? "Signing in..." : "Sign in"}</button>
             {loginMutation.error && <p className="error">{String((loginMutation.error as Error).message)}</p>}

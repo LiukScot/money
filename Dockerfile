@@ -15,11 +15,16 @@ COPY backend/ ./backend/
 COPY scripts/ ./scripts/
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chown bun:bun /app/data
 
 ENV HOST=0.0.0.0 \
     PORT=8001 \
     DB_PATH=/app/data/mymoney.sqlite
 
 EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8001/ || exit 1
+
+USER bun
 CMD ["bun", "--cwd", "backend", "src/server.ts"]

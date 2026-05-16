@@ -1,0 +1,43 @@
+name: Dependabot lockfile sync
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-lockfile:
+    name: Sync npm lockfiles
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
+        with:
+          node-version: 22
+
+      - name: Refresh root lockfile
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Refresh backend lockfile
+        run: npm --prefix backend install --package-lock-only --ignore-scripts
+
+      - name: Refresh frontend lockfile
+        run: npm --prefix frontend install --package-lock-only --ignore-scripts
+
+      - name: Commit lockfile updates if changed
+        run: |
+          if [[ -n "$(git status --porcelain package-lock.json backend/package-lock.json frontend/package-lock.json)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json backend/package-lock.json frontend/package-lock.json
+            git commit -m "chore: sync lockfiles after dependabot bump"
+            git push
+          fi

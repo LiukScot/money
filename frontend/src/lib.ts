@@ -23,6 +23,8 @@ export async function apiFetch<T>(
   return parser(json);
 }
 
+const EUR = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
+
 export function formatCurrency(value: number) {
-  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(value || 0);
+  return EUR.format(value || 0);
 }

@@ -30,19 +30,19 @@ runMigrations(db);
 db.query(`DELETE FROM user_sessions WHERE expires_at <= ?`).run(Math.floor(Date.now() / 1000));
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1)
+  email: z.string().email().max(254),
+  password: z.string().min(1).max(72)
 });
 
 const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1),
-    newPassword: z.string().min(8)
+    currentPassword: z.string().min(1).max(72),
+    newPassword: z.string().min(8).max(72)
   })
   .strict();
 
 const txSchema = z.object({
-  txDate: z.string().min(1),
+  txDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   asset: z.string().min(1),
   tipo: z.string().min(1),
   derivedType: z.string().optional(),
@@ -60,7 +60,7 @@ const movementSchema = z.object({
 });
 
 const snapshotSchema = z.object({
-  snapshotDate: z.string().min(1),
+  snapshotDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   lowRisk: z.coerce.number().default(0),
   mediumRisk: z.coerce.number().default(0),
   highRisk: z.coerce.number().default(0),
@@ -93,6 +93,8 @@ type SessionData = { sid: string; userId: number; email: string };
 function setSecurityHeaders(h: Headers): void {
   h.set("x-content-type-options", "nosniff");
   h.set("x-frame-options", "DENY");
+  h.set("content-security-policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:");
+  h.set("referrer-policy", "strict-origin-when-cross-origin");
 }
 
 function makeError(

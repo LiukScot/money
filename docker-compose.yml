@@ -3,6 +3,7 @@ services:
     build: .
     image: mymoney:local
     container_name: mymoney
+    user: "1000:1000"
     ports:
       - "${HOST_PORT:-8001}:8001"
     environment:

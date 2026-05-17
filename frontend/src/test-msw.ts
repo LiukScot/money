@@ -1,5 +1,7 @@
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
+import { z } from "zod";
+import { stylesMapSchema } from "./types";
 
 type SnapshotRow = {
   id: string;
@@ -19,6 +21,10 @@ type TestState = {
   styles: Record<string, { colorHex: string | null; riskLevel: string | null }>;
   preferences: { showZeroAssets: boolean; updatedAt: string | null };
 };
+
+const putStylesBody = z.object({ styles: stylesMapSchema });
+const putPrefsBody = z.object({ showZeroAssets: z.boolean() });
+const loginBody = z.object({ email: z.string(), password: z.string() });
 
 export const testState: TestState = {
   authenticated: false,
@@ -45,16 +51,22 @@ export const handlers = [
     return HttpResponse.json({ data: { authenticated: true, user: testState.user } });
   }),
   http.post("/api/v1/auth/login", async ({ request }) => {
-    const body = (await request.json()) as { email: string; password: string };
-    if (body.password === "WrongPassword!") {
+    const parsed = loginBody.safeParse(await request.json());
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: "Invalid body" } },
+        { status: 400 }
+      );
+    }
+    if (parsed.data.password === "WrongPassword!") {
       return HttpResponse.json(
         { error: { code: "INVALID_CREDENTIALS", message: "Invalid credentials" } },
         { status: 401 }
       );
     }
     testState.authenticated = true;
-    testState.user = { id: 1, email: body.email, name: "Tester" };
-    return HttpResponse.json({ data: { email: body.email, name: "Tester" } });
+    testState.user = { id: 1, email: parsed.data.email, name: "Tester" };
+    return HttpResponse.json({ data: { email: parsed.data.email, name: "Tester" } });
   }),
   http.post("/api/v1/auth/logout", () => {
     testState.authenticated = false;
@@ -66,14 +78,26 @@ export const handlers = [
   http.get("/api/v1/monthly-snapshots", () => HttpResponse.json({ data: testState.snapshots })),
   http.get("/api/v1/assets/styles", () => HttpResponse.json({ data: testState.styles })),
   http.put("/api/v1/assets/styles", async ({ request }) => {
-    const body = (await request.json()) as { styles: TestState["styles"] };
-    testState.styles = body.styles ?? {};
+    const parsed = putStylesBody.safeParse(await request.json());
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: "Invalid styles payload" } },
+        { status: 400 }
+      );
+    }
+    testState.styles = parsed.data.styles;
     return HttpResponse.json({ data: { ok: true } });
   }),
   http.get("/api/v1/preferences", () => HttpResponse.json({ data: testState.preferences })),
   http.put("/api/v1/preferences", async ({ request }) => {
-    const body = (await request.json()) as { showZeroAssets: boolean };
-    testState.preferences = { showZeroAssets: Boolean(body.showZeroAssets), updatedAt: null };
+    const parsed = putPrefsBody.safeParse(await request.json());
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: "Invalid preferences payload" } },
+        { status: 400 }
+      );
+    }
+    testState.preferences = { showZeroAssets: parsed.data.showZeroAssets, updatedAt: null };
     return HttpResponse.json({ data: { ok: true } });
   })
 ];

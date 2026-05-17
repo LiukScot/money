@@ -10,7 +10,7 @@ test.describe("restored dashboard (issue #39)", () => {
     await seedTransaction(request, { asset: "ETF-A", buyValue: 1000, pnl: 25, txDate: "2026-05-10" });
     await loginUi(page);
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-    await expect(page.getByTestId("kpi-last-tx-date")).toHaveText("2026-05-10");
+    await expect(page.getByTestId("kpi-last-tx-date")).toHaveAttribute("data-raw-date", "2026-05-10");
   });
 
   test("asset blocks expose color picker and risk pill", async ({ page, request }) => {

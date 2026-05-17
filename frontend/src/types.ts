@@ -3,7 +3,7 @@ import { apiEnvelopeSchema } from "./lib";
 
 export const txSchema = z.object({
   id: z.string(),
-  txDate: z.string(),
+  txDate: z.iso.date(),
   asset: z.string(),
   tipo: z.string(),
   derivedType: z.string(),
@@ -23,7 +23,7 @@ export const mmSchema = z.object({
 
 export const snapSchema = z.object({
   id: z.string(),
-  snapshotDate: z.string(),
+  snapshotDate: z.iso.date(),
   lowRisk: z.number(),
   mediumRisk: z.number(),
   highRisk: z.number(),

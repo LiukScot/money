@@ -34,7 +34,11 @@ export function AssetBlocks({ visibleAssets, stylesMap, onChangeStyle }: Props) 
         return (
           <article key={stat.asset} className="asset-block" data-testid={`asset-block-${stat.asset}`}>
             <header className="asset-block__head">
-              <span className="asset-block__swatch" style={{ background: stat.color }} aria-hidden />
+              <span
+                className="asset-block__swatch"
+                style={{ background: normalizeColor(colorValue) }}
+                aria-hidden
+              />
               <h3>{stat.asset}</h3>
             </header>
             <dl className="asset-block__stats">
@@ -56,9 +60,11 @@ export function AssetBlocks({ visibleAssets, stylesMap, onChangeStyle }: Props) 
               </div>
             </dl>
             <div className="asset-block__controls">
-              <label className="asset-block__color">
+              <label className="asset-block__color" htmlFor={`asset-color-${stat.asset}`}>
                 Color
                 <input
+                  id={`asset-color-${stat.asset}`}
+                  name={`asset-color-${stat.asset}`}
                   type="color"
                   aria-label={`Color for ${stat.asset}`}
                   value={normalizeColor(colorValue)}

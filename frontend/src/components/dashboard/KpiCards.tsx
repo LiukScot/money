@@ -1,4 +1,4 @@
-import { formatCurrency } from "../../lib";
+import { formatCurrency, formatShortDate } from "../../lib";
 
 export type DashboardKpis = {
   totalInvested: number;
@@ -44,7 +44,9 @@ export function KpiCards({ kpis }: { kpis: DashboardKpis }) {
       </article>
       <article>
         <h3>Last transaction</h3>
-        <strong data-testid="kpi-last-tx-date">{kpis.lastTxDate ?? "—"}</strong>
+        <strong data-testid="kpi-last-tx-date" data-raw-date={kpis.lastTxDate ?? ""}>
+          {formatShortDate(kpis.lastTxDate)}
+        </strong>
       </article>
     </div>
   );

@@ -1,3 +1,5 @@
+const INPUT_ID = "show-zero-assets";
+
 export function ZeroAssetsToggle({
   checked,
   onChange,
@@ -8,8 +10,10 @@ export function ZeroAssetsToggle({
   disabled?: boolean;
 }) {
   return (
-    <label className="zero-toggle">
+    <label className="zero-toggle" htmlFor={INPUT_ID}>
       <input
+        id={INPUT_ID}
+        name={INPUT_ID}
         type="checkbox"
         checked={checked}
         disabled={disabled}

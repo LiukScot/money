@@ -27,26 +27,32 @@ export function DashboardPanel() {
 
   const txQuery = useQuery({
     queryKey: ["transactions"],
-    queryFn: async () =>
-      apiFetch("/api/v1/transactions", { method: "GET" }, (raw) => txListResponse.parse(raw).data)
+    queryFn: async ({ signal }) =>
+      apiFetch("/api/v1/transactions", { method: "GET", signal }, (raw) => txListResponse.parse(raw).data)
   });
 
   const mmQuery = useQuery({
     queryKey: ["movements"],
-    queryFn: async () =>
-      apiFetch("/api/v1/monthly-movements", { method: "GET" }, (raw) => mmListResponse.parse(raw).data)
+    queryFn: async ({ signal }) =>
+      apiFetch("/api/v1/monthly-movements", { method: "GET", signal }, (raw) =>
+        mmListResponse.parse(raw).data
+      )
   });
 
   const stylesQuery = useQuery({
     queryKey: ["styles"],
-    queryFn: async () =>
-      apiFetch("/api/v1/assets/styles", { method: "GET" }, (raw) => stylesResponse.parse(raw).data)
+    queryFn: async ({ signal }) =>
+      apiFetch("/api/v1/assets/styles", { method: "GET", signal }, (raw) =>
+        stylesResponse.parse(raw).data
+      )
   });
 
   const prefsQuery = useQuery({
     queryKey: ["prefs"],
-    queryFn: async () =>
-      apiFetch("/api/v1/preferences", { method: "GET" }, (raw) => prefsResponse.parse(raw).data)
+    queryFn: async ({ signal }) =>
+      apiFetch("/api/v1/preferences", { method: "GET", signal }, (raw) =>
+        prefsResponse.parse(raw).data
+      )
   });
 
   const stylesMutation = useMutation({
@@ -56,7 +62,16 @@ export function DashboardPanel() {
         { method: "PUT", body: JSON.stringify({ styles }) },
         (raw) => okSchema.parse(raw).data
       ),
-    onSuccess: async () => {
+    onMutate: async (next) => {
+      await queryClient.cancelQueries({ queryKey: ["styles"] });
+      const previous = queryClient.getQueryData<StylesMap>(["styles"]);
+      queryClient.setQueryData<StylesMap>(["styles"], next);
+      return { previous };
+    },
+    onError: (_err, _next, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(["styles"], ctx.previous);
+    },
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: ["styles"] });
     }
   });
@@ -109,9 +124,10 @@ export function DashboardPanel() {
     asset: string,
     patch: { colorHex?: string | null; riskLevel?: RiskLevel | null }
   ) => {
-    const current = stylesMap[asset] ?? { colorHex: null, riskLevel: null };
+    const latest = queryClient.getQueryData<StylesMap>(["styles"]) ?? stylesMap;
+    const current = latest[asset] ?? { colorHex: null, riskLevel: null };
     const next: StylesMap = {
-      ...stylesMap,
+      ...latest,
       [asset]: {
         colorHex: "colorHex" in patch ? (patch.colorHex ?? null) : current.colorHex,
         riskLevel: "riskLevel" in patch ? (patch.riskLevel ?? null) : current.riskLevel

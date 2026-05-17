@@ -42,6 +42,13 @@ export const snapshotSchema = z.object({
   liquid: z.coerce.number().default(0)
 });
 
+export const quickSnapshotSchema = z.object({
+  lowRisk: z.coerce.number().default(0),
+  mediumRisk: z.coerce.number().default(0),
+  highRisk: z.coerce.number().default(0),
+  liquid: z.coerce.number().default(0)
+});
+
 export const stylesSchema = z.object({
   styles: z.record(
     z.string(),

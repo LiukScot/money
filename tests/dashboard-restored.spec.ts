@@ -29,7 +29,7 @@ test.describe("restored dashboard (issue #39)", () => {
     await seedTransaction(request, { asset: "ETF-A", buyValue: 0, pnl: 0 });
     await loginUi(page);
     await expect(page.getByTestId("asset-blocks-empty")).toBeVisible();
-    await page.getByLabel("Show zero-value assets").check();
+    await page.getByLabel("Show zero-value assets").click();
     await expect(page.getByTestId("asset-block-ETF-A")).toBeVisible();
     await page.reload();
     await expect(page.getByTestId("asset-block-ETF-A")).toBeVisible();

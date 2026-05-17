@@ -1,12 +1,21 @@
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 
+type SnapshotRow = {
+  id: string;
+  snapshotDate: string;
+  lowRisk: number;
+  mediumRisk: number;
+  highRisk: number;
+  liquid: number;
+};
+
 type TestState = {
   authenticated: boolean;
   user: { id: number; email: string; name: string | null };
   transactions: unknown[];
   movements: unknown[];
-  snapshots: unknown[];
+  snapshots: SnapshotRow[];
   styles: Record<string, { colorHex: string | null; riskLevel: string | null }>;
   preferences: { showZeroAssets: boolean; updatedAt: string | null };
 };
@@ -55,8 +64,39 @@ export const handlers = [
   http.post("/api/v1/transactions", () => HttpResponse.json({ data: { id: "tx-stub" } }, { status: 201 })),
   http.get("/api/v1/monthly-movements", () => HttpResponse.json({ data: testState.movements })),
   http.get("/api/v1/monthly-snapshots", () => HttpResponse.json({ data: testState.snapshots })),
+  http.post("/api/v1/monthly-snapshots/quick", async ({ request }) => {
+    const body = (await request.json()) as {
+      lowRisk?: number;
+      mediumRisk?: number;
+      highRisk?: number;
+      liquid?: number;
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    const next = testState.snapshots.filter((s) => s.snapshotDate !== today);
+    const id = `snap-${Math.random().toString(36).slice(2)}`;
+    next.push({
+      id,
+      snapshotDate: today,
+      lowRisk: Number(body.lowRisk ?? 0),
+      mediumRisk: Number(body.mediumRisk ?? 0),
+      highRisk: Number(body.highRisk ?? 0),
+      liquid: Number(body.liquid ?? 0)
+    });
+    testState.snapshots = next;
+    return HttpResponse.json({ data: { id, snapshotDate: today } }, { status: 201 });
+  }),
   http.get("/api/v1/assets/styles", () => HttpResponse.json({ data: testState.styles })),
-  http.get("/api/v1/preferences", () => HttpResponse.json({ data: testState.preferences }))
+  http.put("/api/v1/assets/styles", async ({ request }) => {
+    const body = (await request.json()) as { styles: TestState["styles"] };
+    testState.styles = body.styles ?? {};
+    return HttpResponse.json({ data: { ok: true } });
+  }),
+  http.get("/api/v1/preferences", () => HttpResponse.json({ data: testState.preferences })),
+  http.put("/api/v1/preferences", async ({ request }) => {
+    const body = (await request.json()) as { showZeroAssets: boolean };
+    testState.preferences = { showZeroAssets: Boolean(body.showZeroAssets), updatedAt: null };
+    return HttpResponse.json({ data: { ok: true } });
+  })
 ];
 
 export const server = setupServer(...handlers);

@@ -150,7 +150,7 @@ describe("Dashboard panel (authenticated state)", () => {
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
     await waitFor(() => {
-      expect(screen.getByText(/1234,00|1\.234,00/)).toBeInTheDocument();
+      expect(screen.getAllByText(/1234,00|1\.234,00/).length).toBeGreaterThan(0);
     });
   });
 });

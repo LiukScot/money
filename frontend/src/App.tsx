@@ -1,14 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { create } from "zustand";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
-import { Pie } from "react-chartjs-2";
 import { apiEnvelopeSchema, apiFetch, formatCurrency } from "./lib";
-
-ChartJS.register(ArcElement, Tooltip, Legend);
+import { mmSchema, snapSchema, txSchema } from "./types";
+import { DashboardPanel } from "./components/dashboard/DashboardPanel";
 
 type User = { id: number; email: string; name: string | null };
 type AuthState = { user: User | null; setUser: (user: User | null) => void };
@@ -33,35 +31,6 @@ const changePasswordSchema = z
     confirmPassword: z.string().min(8)
   })
   .refine((v) => v.newPassword === v.confirmPassword, { path: ["confirmPassword"], message: "Passwords do not match" });
-
-const txSchema = z.object({
-  id: z.string(),
-  txDate: z.string(),
-  asset: z.string(),
-  tipo: z.string(),
-  derivedType: z.string(),
-  buyValue: z.number(),
-  pnl: z.number(),
-  currentValue: z.number(),
-  note: z.string()
-});
-
-const mmSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  direction: z.enum(["income", "expense"]),
-  amount: z.number(),
-  note: z.string()
-});
-
-const snapSchema = z.object({
-  id: z.string(),
-  snapshotDate: z.string(),
-  lowRisk: z.number(),
-  mediumRisk: z.number(),
-  highRisk: z.number(),
-  liquid: z.number()
-});
 
 const txFormSchema = z.object({
   txDate: z.string().min(1),
@@ -335,41 +304,6 @@ function App() {
     }
   });
 
-  const dashboard = useMemo(() => {
-    const tx = txQuery.data ?? [];
-    const mm = mmQuery.data ?? [];
-    const totalInvested = tx.reduce((sum, row) => sum + row.currentValue, 0);
-    const totalPnl = tx.reduce((sum, row) => sum + row.pnl, 0);
-    const assets = Array.from(new Set(tx.map((row) => row.asset)));
-    const { income, expense } = mm.reduce(
-      (acc, row) => {
-        if (row.direction === "income") acc.income += row.amount;
-        else acc.expense += row.amount;
-        return acc;
-      },
-      { income: 0, expense: 0 }
-    );
-    return {
-      totalInvested,
-      totalPnl,
-      assets: assets.length,
-      txCount: tx.length,
-      monthlyIncome: income,
-      monthlyExpense: expense,
-      monthlyNet: income - expense,
-      pieData: {
-        labels: assets,
-        datasets: [
-          {
-            label: "Allocation",
-            data: assets.map((asset) => tx.filter((row) => row.asset === asset).reduce((sum, row) => sum + row.currentValue, 0)),
-            backgroundColor: assets.map((asset, index) => stylesQuery.data?.[asset]?.colorHex || ["#5de2a5", "#7fc3ff", "#ffd57f", "#ff8da1", "#c6a3ff", "#9bd8ff"][index % 6])
-          }
-        ]
-      }
-    };
-  }, [txQuery.data, mmQuery.data, stylesQuery.data]);
-
   const doExportJson = async () => {
     const payload = await apiFetch("/api/v1/backup/json", { method: "GET" }, (raw) => apiEnvelopeSchema(z.any()).parse(raw).data);
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -455,23 +389,7 @@ function App() {
         ))}
       </nav>
 
-      {nav === "dashboard" && (
-        <section className="panel">
-          <h2>Dashboard</h2>
-          <div className="stats-grid">
-            <article><h3>Total invested</h3><strong>{formatCurrency(dashboard.totalInvested)}</strong></article>
-            <article><h3>Total PnL</h3><strong>{formatCurrency(dashboard.totalPnl)}</strong></article>
-            <article><h3>Assets</h3><strong>{dashboard.assets}</strong></article>
-            <article><h3>Transactions</h3><strong>{dashboard.txCount}</strong></article>
-            <article><h3>Monthly income</h3><strong>{formatCurrency(dashboard.monthlyIncome)}</strong></article>
-            <article><h3>Monthly expense</h3><strong>{formatCurrency(dashboard.monthlyExpense)}</strong></article>
-            <article><h3>Monthly net</h3><strong>{formatCurrency(dashboard.monthlyNet)}</strong></article>
-          </div>
-          <div className="chart-wrap">
-            <Pie data={dashboard.pieData} />
-          </div>
-        </section>
-      )}
+      {nav === "dashboard" && <DashboardPanel />}
 
       {nav === "transactions" && (
         <section className="panel">

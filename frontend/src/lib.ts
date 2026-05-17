@@ -28,3 +28,12 @@ const EUR = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" 
 export function formatCurrency(value: number) {
   return EUR.format(value || 0);
 }
+
+const SHORT_DATE = new Intl.DateTimeFormat("it-IT", { year: "numeric", month: "2-digit", day: "2-digit" });
+
+export function formatShortDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "—";
+  return SHORT_DATE.format(new Date(ms));
+}

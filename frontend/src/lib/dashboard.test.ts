@@ -1,15 +1,11 @@
 import { describe, expect, test } from "vitest";
 import {
   computePerAsset,
-  computeRiskTotals,
   cycleRisk,
-  filterSnapshotsByRange,
   filterVisibleAssets,
-  findLastTxDate,
-  rangeCutoff,
-  summarizeMonthlyReview
+  findLastTxDate
 } from "./dashboard";
-import type { Snapshot, StylesMap, Transaction } from "../types";
+import type { StylesMap, Transaction } from "../types";
 
 function tx(asset: string, buy: number, pnl: number, txDate = "2026-05-01"): Transaction {
   return {
@@ -22,17 +18,6 @@ function tx(asset: string, buy: number, pnl: number, txDate = "2026-05-01"): Tra
     pnl,
     currentValue: buy + pnl,
     note: ""
-  };
-}
-
-function snap(snapshotDate: string): Snapshot {
-  return {
-    id: `s-${snapshotDate}`,
-    snapshotDate,
-    lowRisk: 1,
-    mediumRisk: 1,
-    highRisk: 1,
-    liquid: 1
   };
 }
 
@@ -97,60 +82,6 @@ describe("cycleRisk", () => {
   });
 });
 
-describe("rangeCutoff", () => {
-  test("returns null for 'all'", () => {
-    expect(rangeCutoff("all")).toBeNull();
-  });
-
-  test("subtracts months/years correctly", () => {
-    const now = new Date("2026-06-30T12:00:00Z");
-    expect(rangeCutoff("3m", now)?.toISOString().slice(0, 10)).toBe("2026-03-30");
-    expect(rangeCutoff("1y", now)?.toISOString().slice(0, 10)).toBe("2025-06-30");
-    expect(rangeCutoff("10y", now)?.toISOString().slice(0, 10)).toBe("2016-06-30");
-  });
-});
-
-describe("filterSnapshotsByRange", () => {
-  const list = [snap("2024-01-15"), snap("2025-12-01"), snap("2026-05-01"), snap("2026-06-01")];
-  const now = new Date("2026-06-15T00:00:00Z");
-
-  test("'all' returns full list", () => {
-    expect(filterSnapshotsByRange(list, "all", now)).toHaveLength(4);
-  });
-
-  test("'3m' keeps only recent", () => {
-    const out = filterSnapshotsByRange(list, "3m", now).map((s) => s.snapshotDate);
-    expect(out).toEqual(["2026-05-01", "2026-06-01"]);
-  });
-
-  test("'1y' keeps last year", () => {
-    const out = filterSnapshotsByRange(list, "1y", now).map((s) => s.snapshotDate);
-    expect(out).toEqual(["2025-12-01", "2026-05-01", "2026-06-01"]);
-  });
-
-  test("ignores invalid date strings", () => {
-    const broken = [...list, { ...snap("not-a-date") }];
-    expect(filterSnapshotsByRange(broken, "10y", now)).toHaveLength(4);
-  });
-});
-
-describe("computeRiskTotals", () => {
-  test("sums current values by risk level, ignores null/liquid", () => {
-    const styles: StylesMap = {
-      A: { colorHex: null, riskLevel: "low" },
-      B: { colorHex: null, riskLevel: "medium" },
-      C: { colorHex: null, riskLevel: "high" },
-      D: { colorHex: null, riskLevel: null }
-    };
-    const stats = computePerAsset(
-      [tx("A", 100, 0), tx("B", 200, 0), tx("C", 300, 0), tx("D", 50, 0)],
-      styles
-    );
-    const totals = computeRiskTotals(stats);
-    expect(totals).toEqual({ lowRisk: 100, mediumRisk: 200, highRisk: 300 });
-  });
-});
-
 describe("findLastTxDate", () => {
   test("returns null when empty", () => {
     expect(findLastTxDate([])).toBeNull();
@@ -160,16 +91,5 @@ describe("findLastTxDate", () => {
     expect(findLastTxDate([tx("A", 1, 0, "2026-01-01"), tx("B", 1, 0, "2026-05-17")])).toBe(
       "2026-05-17"
     );
-  });
-});
-
-describe("summarizeMonthlyReview", () => {
-  test("zero count + null when empty", () => {
-    expect(summarizeMonthlyReview([])).toEqual({ count: 0, latestDate: null });
-  });
-
-  test("count + latest date over filtered set", () => {
-    const out = summarizeMonthlyReview([snap("2025-12-01"), snap("2026-05-01"), snap("2026-03-01")]);
-    expect(out).toEqual({ count: 3, latestDate: "2026-05-01" });
   });
 });

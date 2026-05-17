@@ -8,7 +8,6 @@ import {
   txSchema,
   movementSchema,
   snapshotSchema,
-  quickSnapshotSchema,
   stylesSchema,
   prefsSchema,
   backupImportSchema,
@@ -363,21 +362,6 @@ export function createApi(opts: ApiOptions) {
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).run(id, userId, body.snapshotDate, body.lowRisk, body.mediumRisk, body.highRisk, body.liquid);
       return makeData({ id }, 201, corsHeaders);
-    }
-
-    if (pathname === "/api/v1/monthly-snapshots/quick" && method === "POST") {
-      const body = await parseJson(req, quickSnapshotSchema);
-      const today = new Date().toISOString().slice(0, 10);
-      const id = makeId("snap");
-      const upsert = db.transaction(() => {
-        db.query(`DELETE FROM monthly_snapshots WHERE user_id = ? AND snapshot_date = ?`).run(userId, today);
-        db.query(
-          `INSERT INTO monthly_snapshots (id, user_id, snapshot_date, low_risk, medium_risk, high_risk, liquid)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).run(id, userId, today, body.lowRisk, body.mediumRisk, body.highRisk, body.liquid);
-      });
-      upsert();
-      return makeData({ id, snapshotDate: today }, 201, corsHeaders);
     }
 
     const snapMatch = pathname.match(/^\/api\/v1\/monthly-snapshots\/([^/]+)$/);

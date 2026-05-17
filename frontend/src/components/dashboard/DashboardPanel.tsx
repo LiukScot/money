@@ -5,12 +5,10 @@ import { z } from "zod";
 import {
   mmListResponse,
   prefsResponse,
-  snapListResponse,
   stylesResponse,
   type Movement,
   type Preferences,
   type RiskLevel,
-  type Snapshot,
   type StylesMap,
   type Transaction,
   txListResponse
@@ -20,8 +18,6 @@ import { KpiCards } from "./KpiCards";
 import { AssetBlocks } from "./AssetBlocks";
 import { AssetAllocationChart } from "./AssetAllocationChart";
 import { AssetPnlChart } from "./AssetPnlChart";
-import { MonthlyReview } from "./MonthlyReview";
-import { QuickLiquidity } from "./QuickLiquidity";
 import { ZeroAssetsToggle } from "./ZeroAssetsToggle";
 
 const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
@@ -39,12 +35,6 @@ export function DashboardPanel() {
     queryKey: ["movements"],
     queryFn: async () =>
       apiFetch("/api/v1/monthly-movements", { method: "GET" }, (raw) => mmListResponse.parse(raw).data)
-  });
-
-  const snapQuery = useQuery({
-    queryKey: ["snapshots"],
-    queryFn: async () =>
-      apiFetch("/api/v1/monthly-snapshots", { method: "GET" }, (raw) => snapListResponse.parse(raw).data)
   });
 
   const stylesQuery = useQuery({
@@ -85,7 +75,6 @@ export function DashboardPanel() {
 
   const transactions: Transaction[] = txQuery.data ?? [];
   const movements: Movement[] = mmQuery.data ?? [];
-  const snapshots: Snapshot[] = snapQuery.data ?? [];
   const stylesMap: StylesMap = stylesQuery.data ?? {};
   const prefs: Preferences = prefsQuery.data ?? { showZeroAssets: false, updatedAt: null };
 
@@ -157,9 +146,6 @@ export function DashboardPanel() {
           <AssetPnlChart visibleAssets={visibleAssets} />
         </div>
       </div>
-
-      <MonthlyReview snapshots={snapshots} />
-      <QuickLiquidity stats={visibleAssets} />
     </section>
   );
 }

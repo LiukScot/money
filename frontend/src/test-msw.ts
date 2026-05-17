@@ -64,27 +64,6 @@ export const handlers = [
   http.post("/api/v1/transactions", () => HttpResponse.json({ data: { id: "tx-stub" } }, { status: 201 })),
   http.get("/api/v1/monthly-movements", () => HttpResponse.json({ data: testState.movements })),
   http.get("/api/v1/monthly-snapshots", () => HttpResponse.json({ data: testState.snapshots })),
-  http.post("/api/v1/monthly-snapshots/quick", async ({ request }) => {
-    const body = (await request.json()) as {
-      lowRisk?: number;
-      mediumRisk?: number;
-      highRisk?: number;
-      liquid?: number;
-    };
-    const today = new Date().toISOString().slice(0, 10);
-    const next = testState.snapshots.filter((s) => s.snapshotDate !== today);
-    const id = `snap-${Math.random().toString(36).slice(2)}`;
-    next.push({
-      id,
-      snapshotDate: today,
-      lowRisk: Number(body.lowRisk ?? 0),
-      mediumRisk: Number(body.mediumRisk ?? 0),
-      highRisk: Number(body.highRisk ?? 0),
-      liquid: Number(body.liquid ?? 0)
-    });
-    testState.snapshots = next;
-    return HttpResponse.json({ data: { id, snapshotDate: today } }, { status: 201 });
-  }),
   http.get("/api/v1/assets/styles", () => HttpResponse.json({ data: testState.styles })),
   http.put("/api/v1/assets/styles", async ({ request }) => {
     const body = (await request.json()) as { styles: TestState["styles"] };

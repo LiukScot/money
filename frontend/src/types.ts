@@ -57,15 +57,3 @@ export type Preferences = z.infer<typeof prefsSchema>;
 
 export const RISK_LEVELS = ["low", "medium", "high"] as const;
 export type RiskLevel = (typeof RISK_LEVELS)[number];
-
-export const RANGE_KEYS = ["all", "3m", "6m", "1y", "3y", "10y"] as const;
-export type RangeKey = (typeof RANGE_KEYS)[number];
-
-export const RANGE_LABELS: Record<RangeKey, string> = {
-  all: "Since beginning",
-  "3m": "3 months",
-  "6m": "6 months",
-  "1y": "1 year",
-  "3y": "3 years",
-  "10y": "10 years"
-};

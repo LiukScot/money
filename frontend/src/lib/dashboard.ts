@@ -1,10 +1,4 @@
-import type {
-  RangeKey,
-  RiskLevel,
-  Snapshot,
-  StylesMap,
-  Transaction
-} from "../types";
+import type { RiskLevel, StylesMap, Transaction } from "../types";
 import { RISK_LEVELS } from "../types";
 
 const FALLBACK_PALETTE = [
@@ -78,47 +72,6 @@ export function cycleRisk(current: RiskLevel | null): RiskLevel {
   return RISK_LEVELS[(idx + 1) % RISK_LEVELS.length]!;
 }
 
-export function rangeCutoff(range: RangeKey, now: Date = new Date()): Date | null {
-  if (range === "all") return null;
-  const cutoff = new Date(now);
-  if (range === "3m") cutoff.setMonth(cutoff.getMonth() - 3);
-  else if (range === "6m") cutoff.setMonth(cutoff.getMonth() - 6);
-  else if (range === "1y") cutoff.setFullYear(cutoff.getFullYear() - 1);
-  else if (range === "3y") cutoff.setFullYear(cutoff.getFullYear() - 3);
-  else if (range === "10y") cutoff.setFullYear(cutoff.getFullYear() - 10);
-  return cutoff;
-}
-
-export function filterSnapshotsByRange(
-  snapshots: readonly Snapshot[],
-  range: RangeKey,
-  now: Date = new Date()
-): Snapshot[] {
-  const cutoff = rangeCutoff(range, now);
-  if (!cutoff) return [...snapshots];
-  const cutoffMs = cutoff.getTime();
-  return snapshots.filter((s) => {
-    const t = new Date(s.snapshotDate).getTime();
-    return Number.isFinite(t) && t >= cutoffMs;
-  });
-}
-
-export function computeRiskTotals(stats: readonly AssetStats[]): {
-  lowRisk: number;
-  mediumRisk: number;
-  highRisk: number;
-} {
-  return stats.reduce(
-    (acc, s) => {
-      if (s.riskLevel === "low") acc.lowRisk += s.current;
-      else if (s.riskLevel === "medium") acc.mediumRisk += s.current;
-      else if (s.riskLevel === "high") acc.highRisk += s.current;
-      return acc;
-    },
-    { lowRisk: 0, mediumRisk: 0, highRisk: 0 }
-  );
-}
-
 export function findLastTxDate(transactions: readonly Transaction[]): string | null {
   if (transactions.length === 0) return null;
   let latest: string | null = null;
@@ -127,16 +80,4 @@ export function findLastTxDate(transactions: readonly Transaction[]): string | n
     if (!latest || row.txDate > latest) latest = row.txDate;
   }
   return latest;
-}
-
-export function summarizeMonthlyReview(filtered: readonly Snapshot[]): {
-  count: number;
-  latestDate: string | null;
-} {
-  if (filtered.length === 0) return { count: 0, latestDate: null };
-  const latest = filtered.reduce<string | null>((acc, s) => {
-    if (!acc) return s.snapshotDate;
-    return s.snapshotDate > acc ? s.snapshotDate : acc;
-  }, null);
-  return { count: filtered.length, latestDate: latest };
 }

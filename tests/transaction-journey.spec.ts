@@ -14,9 +14,8 @@ test.describe("transaction journey", () => {
 
     await page.getByLabel("Date").fill("2026-05-16");
     await page.getByLabel("Asset").fill("ETF-A");
-    await page.getByLabel("Tipo").fill("nuovo vincolo");
+    await page.getByLabel("Tipo").selectOption("nuovo vincolo");
     await page.getByLabel("Buy value").fill("1000");
-    await page.getByLabel("PnL").fill("50");
     await page.getByRole("button", { name: "Add" }).click();
 
     await expect(page.getByRole("cell", { name: "ETF-A" })).toBeVisible();
@@ -32,9 +31,8 @@ test.describe("transaction journey", () => {
     await page.getByRole("button", { name: "transactions" }).click();
     await page.getByLabel("Date").fill("2026-05-16");
     await page.getByLabel("Asset").fill("ETF-DEL");
-    await page.getByLabel("Tipo").fill("nuovo vincolo");
+    await page.getByLabel("Tipo").selectOption("nuovo vincolo");
     await page.getByLabel("Buy value").fill("500");
-    await page.getByLabel("PnL").fill("0");
     await page.getByRole("button", { name: "Add" }).click();
     await expect(page.getByRole("cell", { name: "ETF-DEL" })).toBeVisible();
 

@@ -135,7 +135,7 @@ textarea { min-height: 78px; }
   color: var(--text);
   cursor: pointer;
 }
-.combo-item:hover, .combo-item:focus { background: rgba(255,255,255,0.06); }
+.combo-item:hover, .combo-item:focus, .combo-item.is-focused { background: rgba(255,255,255,0.06); }
 
 .row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 

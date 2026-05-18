@@ -167,9 +167,8 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     await user.click(screen.getByRole("button", { name: "transactions" }));
     const tipoSelect = await screen.findByLabelText("Tipo");
     expect(tipoSelect.tagName).toBe("SELECT");
-    expect(screen.getByRole("option", { name: "nuovo vincolo" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "cedola" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Variazione Valore" })).toBeInTheDocument();
+    const optionNames = Array.from(tipoSelect.querySelectorAll("option")).map((o) => o.textContent);
+    expect(optionNames).toEqual(["nuovo vincolo", "cedola", "interessi", "cashback", "Variazione Valore"]);
   });
 
   test("default tipo 'nuovo vincolo' shows Buy value, hides PnL", async () => {
@@ -193,6 +192,39 @@ describe("Transactions form dynamic fields (issue #51)", () => {
       expect(screen.queryByLabelText("Buy value")).toBeNull();
       expect(screen.getByLabelText("PnL")).toBeInTheDocument();
     });
+  });
+
+  test("asset combobox keyboard nav: ArrowDown + Enter selects an option", async () => {
+    testState.transactions = [
+      { id: "tx-1", txDate: "2026-05-16", asset: "ETF-A", tipo: "nuovo vincolo", derivedType: "buy", buyValue: 1000, pnl: 0, currentValue: 1000, note: "" },
+      { id: "tx-2", txDate: "2026-05-17", asset: "ETF-B", tipo: "cedola", derivedType: "return", buyValue: 0, pnl: 25, currentValue: 25, note: "" }
+    ];
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: "Dashboard" });
+    await user.click(screen.getByRole("button", { name: "transactions" }));
+    const assetInput = (await screen.findByLabelText("Asset")) as HTMLInputElement;
+    assetInput.focus();
+    await waitFor(() => expect(screen.getByRole("option", { name: "ETF-A" })).toBeInTheDocument());
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{Enter}");
+    expect(assetInput.value).toBe("ETF-B");
+  });
+
+  test("asset combobox Escape closes the list", async () => {
+    testState.transactions = [
+      { id: "tx-1", txDate: "2026-05-16", asset: "ETF-A", tipo: "nuovo vincolo", derivedType: "buy", buyValue: 1000, pnl: 0, currentValue: 1000, note: "" }
+    ];
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: "Dashboard" });
+    await user.click(screen.getByRole("button", { name: "transactions" }));
+    const assetInput = (await screen.findByLabelText("Asset")) as HTMLInputElement;
+    assetInput.focus();
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeInTheDocument());
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
   });
 
   test("asset combobox shows existing assets and selects on click", async () => {
@@ -244,27 +276,30 @@ describe("Snapshot auto-derive (issue #51)", () => {
     };
     let captured: unknown = null;
     const origFetch = globalThis.fetch;
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.endsWith("/api/v1/monthly-snapshots") && init?.method === "POST") {
-        captured = JSON.parse(String(init.body));
-      }
-      return origFetch(input as RequestInfo, init);
-    };
-    const user = userEvent.setup();
-    renderApp();
-    await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "snapshots" }));
-    await screen.findByRole("heading", { name: "Monthly snapshots" });
-    await user.click(screen.getByRole("button", { name: "Add" }));
-    await waitFor(() => {
-      expect(captured).not.toBeNull();
-    });
-    globalThis.fetch = origFetch;
-    const body = captured as { lowRisk: number; mediumRisk: number; highRisk: number };
-    expect(body.lowRisk).toBe(0);
-    expect(body.mediumRisk).toBe(1050);
-    expect(body.highRisk).toBe(25);
+    try {
+      globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (url.endsWith("/api/v1/monthly-snapshots") && init?.method === "POST") {
+          captured = JSON.parse(String(init.body));
+        }
+        return origFetch(input as RequestInfo, init);
+      };
+      const user = userEvent.setup();
+      renderApp();
+      await screen.findByRole("heading", { name: "Dashboard" });
+      await user.click(screen.getByRole("button", { name: "snapshots" }));
+      await screen.findByRole("heading", { name: "Monthly snapshots" });
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      await waitFor(() => {
+        expect(captured).not.toBeNull();
+      });
+      const body = captured as { lowRisk: number; mediumRisk: number; highRisk: number };
+      expect(body.lowRisk).toBe(0);
+      expect(body.mediumRisk).toBe(1050);
+      expect(body.highRisk).toBe(25);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 });
 
@@ -286,25 +321,28 @@ describe("Empty number inputs (placeholder, no inserted 0)", () => {
   test("submitting tx with empty Buy value sends 0 to backend (zod coerce)", async () => {
     let captured: { buyValue?: number } | null = null;
     const origFetch = globalThis.fetch;
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.endsWith("/api/v1/transactions") && init?.method === "POST") {
-        captured = JSON.parse(String(init.body));
-      }
-      return origFetch(input as RequestInfo, init);
-    };
-    const user = userEvent.setup();
-    renderApp();
-    await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "transactions" }));
-    await screen.findByLabelText("Buy value");
-    await user.type(screen.getByLabelText("Asset"), "TEST");
-    await user.click(screen.getByRole("button", { name: "Add" }));
-    await waitFor(() => {
-      expect(captured).not.toBeNull();
-    });
-    globalThis.fetch = origFetch;
-    expect((captured as unknown as { buyValue: number }).buyValue).toBe(0);
+    try {
+      globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (url.endsWith("/api/v1/transactions") && init?.method === "POST") {
+          captured = JSON.parse(String(init.body));
+        }
+        return origFetch(input as RequestInfo, init);
+      };
+      const user = userEvent.setup();
+      renderApp();
+      await screen.findByRole("heading", { name: "Dashboard" });
+      await user.click(screen.getByRole("button", { name: "transactions" }));
+      await screen.findByLabelText("Buy value");
+      await user.type(screen.getByLabelText("Asset"), "TEST");
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      await waitFor(() => {
+        expect(captured).not.toBeNull();
+      });
+      expect((captured as unknown as { buyValue: number }).buyValue).toBe(0);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 
   test("mm Amount and snapshot Liquid are empty with placeholder '0'", async () => {

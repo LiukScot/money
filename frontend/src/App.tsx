@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -147,10 +147,6 @@ function App() {
   const watchedTipo = txForm.watch("tipo");
   const showBuyValue = tipoShowsBuyValue(watchedTipo);
   const showPnl = tipoShowsPnl(watchedTipo);
-  useEffect(() => {
-    if (!showBuyValue) txForm.setValue("buyValue", 0);
-    if (!showPnl) txForm.setValue("pnl", 0);
-  }, [showBuyValue, showPnl, txForm]);
 
   const assetOptions = useMemo(() => {
     const set = new Set<string>();
@@ -161,12 +157,47 @@ function App() {
   }, [txQuery.data]);
 
   const [assetComboOpen, setAssetComboOpen] = useState(false);
+  const [assetFocusedIdx, setAssetFocusedIdx] = useState(-1);
   const watchedAsset = txForm.watch("asset");
   const filteredAssetOptions = useMemo(() => {
     const q = (watchedAsset ?? "").toLowerCase().trim();
     if (!q) return assetOptions;
     return assetOptions.filter((a) => a.toLowerCase().includes(q) && a.toLowerCase() !== q);
   }, [assetOptions, watchedAsset]);
+
+  useEffect(() => {
+    setAssetFocusedIdx(-1);
+  }, [watchedAsset, assetComboOpen]);
+
+  const visibleAssetOptions = filteredAssetOptions.slice(0, 8);
+  const selectAssetOption = (a: string) => {
+    txForm.setValue("asset", a, { shouldDirty: true });
+    setAssetComboOpen(false);
+    setAssetFocusedIdx(-1);
+  };
+  const handleAssetKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!assetComboOpen) setAssetComboOpen(true);
+      setAssetFocusedIdx((i) => (visibleAssetOptions.length === 0 ? -1 : (i + 1) % visibleAssetOptions.length));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!assetComboOpen) setAssetComboOpen(true);
+      setAssetFocusedIdx((i) => {
+        if (visibleAssetOptions.length === 0) return -1;
+        return i <= 0 ? visibleAssetOptions.length - 1 : i - 1;
+      });
+    } else if (e.key === "Enter" && assetComboOpen && assetFocusedIdx >= 0) {
+      const choice = visibleAssetOptions[assetFocusedIdx];
+      if (choice) {
+        e.preventDefault();
+        selectAssetOption(choice);
+      }
+    } else if (e.key === "Escape" && assetComboOpen) {
+      e.preventDefault();
+      setAssetComboOpen(false);
+    }
+  };
   const mmForm = useForm<z.infer<typeof mmFormSchema>>({
     defaultValues: {
       name: "",
@@ -227,13 +258,15 @@ function App() {
   const txMutation = useMutation({
     mutationFn: async (values: z.infer<typeof txFormSchema>) => {
       const parsed = txFormSchema.parse(values);
+      const buyValue = tipoShowsBuyValue(parsed.tipo) ? Number(parsed.buyValue) : 0;
+      const pnl = tipoShowsPnl(parsed.tipo) ? Number(parsed.pnl) : 0;
       const payload = {
         txDate: parsed.txDate,
         asset: parsed.asset,
         tipo: parsed.tipo,
-        buyValue: Number(parsed.buyValue),
-        pnl: Number(parsed.pnl),
-        currentValue: Number(parsed.buyValue) + Number(parsed.pnl),
+        buyValue,
+        pnl,
+        currentValue: buyValue + pnl,
         note: parsed.note
       };
       if (editingTxId) {
@@ -282,7 +315,10 @@ function App() {
   const snapMutation = useMutation({
     mutationFn: async (values: z.infer<typeof snapFormSchema>) => {
       const form = snapFormSchema.parse(values);
-      const stats = computePerAsset(txQuery.data ?? [], stylesQuery.data);
+      if (!txQuery.isSuccess || !stylesQuery.isSuccess) {
+        throw new Error("Attendi il caricamento di transazioni e stili asset prima di creare uno snapshot.");
+      }
+      const stats = computePerAsset(txQuery.data, stylesQuery.data);
       const totals = { low: 0, medium: 0, high: 0 };
       for (const s of stats) {
         if (s.riskLevel === "low") totals.low += s.current;
@@ -442,31 +478,33 @@ function App() {
           <h2>Transactions</h2>
           <form onSubmit={txForm.handleSubmit((v) => txMutation.mutate(v))}>
             <div className="form-grid">
-              <label>Date<input type="date" {...txForm.register("txDate")} /></label>
-              <label className="combo">
+              <label htmlFor="tx-date">Date<input id="tx-date" type="date" {...txForm.register("txDate")} /></label>
+              <label htmlFor="tx-asset" className="combo">
                 Asset
                 <input
+                  id="tx-asset"
                   type="text"
                   autoComplete="off"
                   placeholder={assetOptions.length > 0 ? "digita o scegli" : "es. revolut"}
                   role="combobox"
                   aria-expanded={assetComboOpen}
                   aria-controls="tx-asset-combo-list"
+                  aria-activedescendant={assetComboOpen && assetFocusedIdx >= 0 ? `tx-asset-opt-${assetFocusedIdx}` : undefined}
                   {...txForm.register("asset")}
                   onFocus={() => setAssetComboOpen(true)}
                   onBlur={() => window.setTimeout(() => setAssetComboOpen(false), 120)}
+                  onKeyDown={handleAssetKeyDown}
                 />
-                {assetComboOpen && filteredAssetOptions.length > 0 && (
+                {assetComboOpen && visibleAssetOptions.length > 0 && (
                   <ul id="tx-asset-combo-list" className="combo-list" role="listbox">
-                    {filteredAssetOptions.slice(0, 8).map((a) => (
-                      <li key={a} role="option" aria-selected={watchedAsset === a}>
+                    {visibleAssetOptions.map((a, idx) => (
+                      <li key={a} id={`tx-asset-opt-${idx}`} role="option" aria-selected={assetFocusedIdx === idx}>
                         <button
                           type="button"
-                          className="combo-item"
+                          className={"combo-item" + (assetFocusedIdx === idx ? " is-focused" : "")}
                           onMouseDown={(e) => {
                             e.preventDefault();
-                            txForm.setValue("asset", a, { shouldDirty: true });
-                            setAssetComboOpen(false);
+                            selectAssetOption(a);
                           }}
                         >
                           {a}
@@ -476,15 +514,15 @@ function App() {
                   </ul>
                 )}
               </label>
-              <label>
+              <label htmlFor="tx-tipo">
                 Tipo
-                <select {...txForm.register("tipo")}>
+                <select id="tx-tipo" {...txForm.register("tipo")}>
                   {TIPO_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </label>
-              {showBuyValue && <label>Buy value<input type="number" step="0.01" placeholder="0" {...txForm.register("buyValue")} /></label>}
-              {showPnl && <label>PnL<input type="number" step="0.01" placeholder="0" {...txForm.register("pnl")} /></label>}
-              <label>Note<textarea {...txForm.register("note")} /></label>
+              {showBuyValue && <label htmlFor="tx-buyValue">Buy value<input id="tx-buyValue" type="number" step="0.01" placeholder="0" {...txForm.register("buyValue")} /></label>}
+              {showPnl && <label htmlFor="tx-pnl">PnL<input id="tx-pnl" type="number" step="0.01" placeholder="0" {...txForm.register("pnl")} /></label>}
+              <label htmlFor="tx-note">Note<textarea id="tx-note" {...txForm.register("note")} /></label>
             </div>
             <div className="row-actions">
               <button type="submit">{editingTxId ? "Update" : "Add"}</button>
@@ -518,10 +556,10 @@ function App() {
           <h2>Monthly movements</h2>
           <form onSubmit={mmForm.handleSubmit((v) => mmMutation.mutate(v))}>
             <div className="form-grid">
-              <label>Name<input {...mmForm.register("name")} /></label>
-              <label>Direction<select {...mmForm.register("direction")}><option value="income">income</option><option value="expense">expense</option></select></label>
-              <label>Amount<input type="number" step="0.01" placeholder="0" {...mmForm.register("amount")} /></label>
-              <label>Note<textarea {...mmForm.register("note")} /></label>
+              <label htmlFor="mm-name">Name<input id="mm-name" type="text" {...mmForm.register("name")} /></label>
+              <label htmlFor="mm-direction">Direction<select id="mm-direction" {...mmForm.register("direction")}><option value="income">income</option><option value="expense">expense</option></select></label>
+              <label htmlFor="mm-amount">Amount<input id="mm-amount" type="number" step="0.01" placeholder="0" {...mmForm.register("amount")} /></label>
+              <label htmlFor="mm-note">Note<textarea id="mm-note" {...mmForm.register("note")} /></label>
             </div>
             <div className="row-actions"><button type="submit">{editingMmId ? "Update" : "Add"}</button>{editingMmId && <button type="button" onClick={() => { setEditingMmId(null); mmForm.reset({ name: "", direction: "income", amount: "" as unknown as number, note: "" }); }}>Cancel</button>}</div>
           </form>
@@ -550,11 +588,11 @@ function App() {
           <h2>Monthly snapshots</h2>
           <form onSubmit={snapForm.handleSubmit((v) => snapMutation.mutate(v))}>
             <div className="form-grid">
-              <label>Date<input type="date" {...snapForm.register("snapshotDate")} /></label>
-              <label>Liquid<input type="number" step="0.01" placeholder="0" {...snapForm.register("liquid")} /></label>
+              <label htmlFor="snap-date">Date<input id="snap-date" type="date" {...snapForm.register("snapshotDate")} /></label>
+              <label htmlFor="snap-liquid">Liquid<input id="snap-liquid" type="number" step="0.01" placeholder="0" {...snapForm.register("liquid")} /></label>
             </div>
             <div className="row-actions">
-              <button type="submit">Add</button>
+              <button type="submit" disabled={!txQuery.isSuccess || !stylesQuery.isSuccess}>Add</button>
             </div>
           </form>
 

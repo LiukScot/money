@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,6 +7,19 @@ import { create } from "zustand";
 import { apiEnvelopeSchema, apiFetch, formatCurrency } from "./lib";
 import { mmSchema, snapSchema, txSchema } from "./types";
 import { DashboardPanel } from "./components/dashboard/DashboardPanel";
+import { computePerAsset } from "./lib/dashboard";
+
+const TIPO_OPTIONS = ["nuovo vincolo", "cedola", "interessi", "cashback", "Variazione Valore"] as const;
+const TIPO_PNL_ONLY = new Set<string>(["cedola", "interessi", "cashback", "Variazione Valore"]);
+const TIPO_BUY_ONLY = new Set<string>(["nuovo vincolo"]);
+function tipoShowsBuyValue(tipo: string): boolean {
+  if (TIPO_PNL_ONLY.has(tipo)) return false;
+  return true;
+}
+function tipoShowsPnl(tipo: string): boolean {
+  if (TIPO_BUY_ONLY.has(tipo)) return false;
+  return true;
+}
 
 type User = { id: number; email: string; name: string | null };
 type AuthState = { user: User | null; setUser: (user: User | null) => void };
@@ -50,9 +63,6 @@ const mmFormSchema = z.object({
 
 const snapFormSchema = z.object({
   snapshotDate: z.string().min(1),
-  lowRisk: z.coerce.number(),
-  mediumRisk: z.coerce.number(),
-  highRisk: z.coerce.number(),
   liquid: z.coerce.number()
 });
 
@@ -65,7 +75,6 @@ function App() {
   const [nav, setNav] = useState<NavItem>("dashboard");
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [editingMmId, setEditingMmId] = useState<string | null>(null);
-  const [editingSnapId, setEditingSnapId] = useState<string | null>(null);
   const [styleJson, setStyleJson] = useState("{}");
 
   const sessionQuery = useQuery({
@@ -129,19 +138,80 @@ function App() {
       txDate: new Date().toISOString().slice(0, 10),
       asset: "",
       tipo: "nuovo vincolo",
-      buyValue: 0,
-      pnl: 0,
+      // reason: empty string renders placeholder; z.coerce.number maps "" → 0 at submit
+      buyValue: "" as unknown as number,
+      pnl: "" as unknown as number,
       note: ""
     }
   });
-  const mmForm = useForm<z.infer<typeof mmFormSchema>>({ defaultValues: { name: "", direction: "income", amount: 0, note: "" } });
+  const watchedTipo = txForm.watch("tipo");
+  const showBuyValue = tipoShowsBuyValue(watchedTipo);
+  const showPnl = tipoShowsPnl(watchedTipo);
+
+  const assetOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of txQuery.data ?? []) {
+      if (row.asset) set.add(row.asset);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [txQuery.data]);
+
+  const [assetComboOpen, setAssetComboOpen] = useState(false);
+  const [assetFocusedIdx, setAssetFocusedIdx] = useState(-1);
+  const watchedAsset = txForm.watch("asset");
+  const filteredAssetOptions = useMemo(() => {
+    const q = (watchedAsset ?? "").toLowerCase().trim();
+    if (!q) return assetOptions;
+    return assetOptions.filter((a) => a.toLowerCase().includes(q) && a.toLowerCase() !== q);
+  }, [assetOptions, watchedAsset]);
+
+  useEffect(() => {
+    setAssetFocusedIdx(-1);
+  }, [watchedAsset, assetComboOpen]);
+
+  const visibleAssetOptions = filteredAssetOptions.slice(0, 8);
+  const selectAssetOption = (a: string) => {
+    txForm.setValue("asset", a, { shouldDirty: true });
+    setAssetComboOpen(false);
+    setAssetFocusedIdx(-1);
+  };
+  const handleAssetKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!assetComboOpen) setAssetComboOpen(true);
+      setAssetFocusedIdx((i) => (visibleAssetOptions.length === 0 ? -1 : (i + 1) % visibleAssetOptions.length));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!assetComboOpen) setAssetComboOpen(true);
+      setAssetFocusedIdx((i) => {
+        if (visibleAssetOptions.length === 0) return -1;
+        return i <= 0 ? visibleAssetOptions.length - 1 : i - 1;
+      });
+    } else if (e.key === "Enter" && assetComboOpen && assetFocusedIdx >= 0) {
+      const choice = visibleAssetOptions[assetFocusedIdx];
+      if (choice) {
+        e.preventDefault();
+        selectAssetOption(choice);
+      }
+    } else if (e.key === "Escape" && assetComboOpen) {
+      e.preventDefault();
+      setAssetComboOpen(false);
+    }
+  };
+  const mmForm = useForm<z.infer<typeof mmFormSchema>>({
+    defaultValues: {
+      name: "",
+      direction: "income",
+      // reason: empty string renders placeholder; z.coerce.number maps "" → 0 at submit
+      amount: "" as unknown as number,
+      note: ""
+    }
+  });
   const snapForm = useForm<z.infer<typeof snapFormSchema>>({
     defaultValues: {
       snapshotDate: new Date().toISOString().slice(0, 10),
-      lowRisk: 0,
-      mediumRisk: 0,
-      highRisk: 0,
-      liquid: 0
+      // reason: empty string renders placeholder; z.coerce.number maps "" → 0 at submit
+      liquid: "" as unknown as number
     }
   });
 
@@ -188,13 +258,15 @@ function App() {
   const txMutation = useMutation({
     mutationFn: async (values: z.infer<typeof txFormSchema>) => {
       const parsed = txFormSchema.parse(values);
+      const buyValue = tipoShowsBuyValue(parsed.tipo) ? Number(parsed.buyValue) : 0;
+      const pnl = tipoShowsPnl(parsed.tipo) ? Number(parsed.pnl) : 0;
       const payload = {
         txDate: parsed.txDate,
         asset: parsed.asset,
         tipo: parsed.tipo,
-        buyValue: Number(parsed.buyValue),
-        pnl: Number(parsed.pnl),
-        currentValue: Number(parsed.buyValue) + Number(parsed.pnl),
+        buyValue,
+        pnl,
+        currentValue: buyValue + pnl,
         note: parsed.note
       };
       if (editingTxId) {
@@ -212,7 +284,7 @@ function App() {
     },
     onSuccess: async () => {
       setEditingTxId(null);
-      txForm.reset({ txDate: new Date().toISOString().slice(0, 10), asset: "", tipo: "nuovo vincolo", buyValue: 0, pnl: 0, note: "" });
+      txForm.reset({ txDate: new Date().toISOString().slice(0, 10), asset: "", tipo: "nuovo vincolo", buyValue: "" as unknown as number, pnl: "" as unknown as number, note: "" });
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     }
   });
@@ -235,21 +307,32 @@ function App() {
     },
     onSuccess: async () => {
       setEditingMmId(null);
-      mmForm.reset({ name: "", direction: "income", amount: 0, note: "" });
+      mmForm.reset({ name: "", direction: "income", amount: "" as unknown as number, note: "" });
       await queryClient.invalidateQueries({ queryKey: ["movements"] });
     }
   });
 
   const snapMutation = useMutation({
     mutationFn: async (values: z.infer<typeof snapFormSchema>) => {
-      const payload = snapFormSchema.parse(values);
-      if (editingSnapId) {
-        return apiFetch(
-          `/api/v1/monthly-snapshots/${editingSnapId}`,
-          { method: "PUT", body: JSON.stringify(payload) },
-          (raw) => apiEnvelopeSchema(z.object({ ok: z.boolean() })).parse(raw).data
-        );
+      const form = snapFormSchema.parse(values);
+      if (!txQuery.isSuccess || !stylesQuery.isSuccess) {
+        throw new Error("Attendi il caricamento di transazioni e stili asset prima di creare uno snapshot.");
       }
+      const stats = computePerAsset(txQuery.data, stylesQuery.data);
+      const totals = { low: 0, medium: 0, high: 0 };
+      for (const s of stats) {
+        if (s.riskLevel === "low") totals.low += s.current;
+        else if (s.riskLevel === "medium") totals.medium += s.current;
+        else if (s.riskLevel === "high") totals.high += s.current;
+      }
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      const payload = {
+        snapshotDate: form.snapshotDate,
+        lowRisk: round2(totals.low),
+        mediumRisk: round2(totals.medium),
+        highRisk: round2(totals.high),
+        liquid: form.liquid
+      };
       return apiFetch(
         "/api/v1/monthly-snapshots",
         { method: "POST", body: JSON.stringify(payload) },
@@ -257,8 +340,7 @@ function App() {
       );
     },
     onSuccess: async () => {
-      setEditingSnapId(null);
-      snapForm.reset({ snapshotDate: new Date().toISOString().slice(0, 10), lowRisk: 0, mediumRisk: 0, highRisk: 0, liquid: 0 });
+      snapForm.reset({ snapshotDate: new Date().toISOString().slice(0, 10), liquid: "" as unknown as number });
       await queryClient.invalidateQueries({ queryKey: ["snapshots"] });
     }
   });
@@ -394,16 +476,57 @@ function App() {
       {nav === "transactions" && (
         <section className="panel">
           <h2>Transactions</h2>
-          <form className="form-grid" onSubmit={txForm.handleSubmit((v) => txMutation.mutate(v))}>
-            <label>Date<input type="date" {...txForm.register("txDate")} /></label>
-            <label>Asset<input {...txForm.register("asset")} /></label>
-            <label>Tipo<input {...txForm.register("tipo")} /></label>
-            <label>Buy value<input type="number" step="0.01" {...txForm.register("buyValue", { valueAsNumber: true })} /></label>
-            <label>PnL<input type="number" step="0.01" {...txForm.register("pnl", { valueAsNumber: true })} /></label>
-            <label>Note<textarea {...txForm.register("note")} /></label>
+          <form onSubmit={txForm.handleSubmit((v) => txMutation.mutate(v))}>
+            <div className="form-grid">
+              <label htmlFor="tx-date">Date<input id="tx-date" type="date" {...txForm.register("txDate")} /></label>
+              <label htmlFor="tx-asset" className="combo">
+                Asset
+                <input
+                  id="tx-asset"
+                  type="text"
+                  autoComplete="off"
+                  placeholder={assetOptions.length > 0 ? "digita o scegli" : "es. revolut"}
+                  role="combobox"
+                  aria-expanded={assetComboOpen}
+                  aria-controls="tx-asset-combo-list"
+                  aria-activedescendant={assetComboOpen && assetFocusedIdx >= 0 ? `tx-asset-opt-${assetFocusedIdx}` : undefined}
+                  {...txForm.register("asset")}
+                  onFocus={() => setAssetComboOpen(true)}
+                  onBlur={() => window.setTimeout(() => setAssetComboOpen(false), 120)}
+                  onKeyDown={handleAssetKeyDown}
+                />
+                {assetComboOpen && visibleAssetOptions.length > 0 && (
+                  <ul id="tx-asset-combo-list" className="combo-list" role="listbox">
+                    {visibleAssetOptions.map((a, idx) => (
+                      <li key={a} id={`tx-asset-opt-${idx}`} role="option" aria-selected={assetFocusedIdx === idx}>
+                        <button
+                          type="button"
+                          className={"combo-item" + (assetFocusedIdx === idx ? " is-focused" : "")}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectAssetOption(a);
+                          }}
+                        >
+                          {a}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </label>
+              <label htmlFor="tx-tipo">
+                Tipo
+                <select id="tx-tipo" {...txForm.register("tipo")}>
+                  {TIPO_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+              {showBuyValue && <label htmlFor="tx-buyValue">Buy value<input id="tx-buyValue" type="number" step="0.01" placeholder="0" {...txForm.register("buyValue")} /></label>}
+              {showPnl && <label htmlFor="tx-pnl">PnL<input id="tx-pnl" type="number" step="0.01" placeholder="0" {...txForm.register("pnl")} /></label>}
+              <label htmlFor="tx-note">Note<textarea id="tx-note" {...txForm.register("note")} /></label>
+            </div>
             <div className="row-actions">
               <button type="submit">{editingTxId ? "Update" : "Add"}</button>
-              {editingTxId && <button type="button" onClick={() => { setEditingTxId(null); txForm.reset({ txDate: new Date().toISOString().slice(0, 10), asset: "", tipo: "nuovo vincolo", buyValue: 0, pnl: 0, note: "" }); }}>Cancel</button>}
+              {editingTxId && <button type="button" onClick={() => { setEditingTxId(null); txForm.reset({ txDate: new Date().toISOString().slice(0, 10), asset: "", tipo: "nuovo vincolo", buyValue: "" as unknown as number, pnl: "" as unknown as number, note: "" }); }}>Cancel</button>}
             </div>
           </form>
 
@@ -431,12 +554,14 @@ function App() {
       {nav === "movements" && (
         <section className="panel">
           <h2>Monthly movements</h2>
-          <form className="form-grid" onSubmit={mmForm.handleSubmit((v) => mmMutation.mutate(v))}>
-            <label>Name<input {...mmForm.register("name")} /></label>
-            <label>Direction<select {...mmForm.register("direction")}><option value="income">income</option><option value="expense">expense</option></select></label>
-            <label>Amount<input type="number" step="0.01" {...mmForm.register("amount", { valueAsNumber: true })} /></label>
-            <label>Note<textarea {...mmForm.register("note")} /></label>
-            <div className="row-actions"><button type="submit">{editingMmId ? "Update" : "Add"}</button>{editingMmId && <button type="button" onClick={() => { setEditingMmId(null); mmForm.reset({ name: "", direction: "income", amount: 0, note: "" }); }}>Cancel</button>}</div>
+          <form onSubmit={mmForm.handleSubmit((v) => mmMutation.mutate(v))}>
+            <div className="form-grid">
+              <label htmlFor="mm-name">Name<input id="mm-name" type="text" {...mmForm.register("name")} /></label>
+              <label htmlFor="mm-direction">Direction<select id="mm-direction" {...mmForm.register("direction")}><option value="income">income</option><option value="expense">expense</option></select></label>
+              <label htmlFor="mm-amount">Amount<input id="mm-amount" type="number" step="0.01" placeholder="0" {...mmForm.register("amount")} /></label>
+              <label htmlFor="mm-note">Note<textarea id="mm-note" {...mmForm.register("note")} /></label>
+            </div>
+            <div className="row-actions"><button type="submit">{editingMmId ? "Update" : "Add"}</button>{editingMmId && <button type="button" onClick={() => { setEditingMmId(null); mmForm.reset({ name: "", direction: "income", amount: "" as unknown as number, note: "" }); }}>Cancel</button>}</div>
           </form>
 
           <table>
@@ -461,13 +586,14 @@ function App() {
       {nav === "snapshots" && (
         <section className="panel">
           <h2>Monthly snapshots</h2>
-          <form className="form-grid" onSubmit={snapForm.handleSubmit((v) => snapMutation.mutate(v))}>
-            <label>Date<input type="date" {...snapForm.register("snapshotDate")} /></label>
-            <label>Low risk<input type="number" step="0.01" {...snapForm.register("lowRisk", { valueAsNumber: true })} /></label>
-            <label>Medium risk<input type="number" step="0.01" {...snapForm.register("mediumRisk", { valueAsNumber: true })} /></label>
-            <label>High risk<input type="number" step="0.01" {...snapForm.register("highRisk", { valueAsNumber: true })} /></label>
-            <label>Liquid<input type="number" step="0.01" {...snapForm.register("liquid", { valueAsNumber: true })} /></label>
-            <div className="row-actions"><button type="submit">{editingSnapId ? "Update" : "Add"}</button>{editingSnapId && <button type="button" onClick={() => { setEditingSnapId(null); snapForm.reset({ snapshotDate: new Date().toISOString().slice(0, 10), lowRisk: 0, mediumRisk: 0, highRisk: 0, liquid: 0 }); }}>Cancel</button>}</div>
+          <form onSubmit={snapForm.handleSubmit((v) => snapMutation.mutate(v))}>
+            <div className="form-grid">
+              <label htmlFor="snap-date">Date<input id="snap-date" type="date" {...snapForm.register("snapshotDate")} /></label>
+              <label htmlFor="snap-liquid">Liquid<input id="snap-liquid" type="number" step="0.01" placeholder="0" {...snapForm.register("liquid")} /></label>
+            </div>
+            <div className="row-actions">
+              <button type="submit" disabled={!txQuery.isSuccess || !stylesQuery.isSuccess}>Add</button>
+            </div>
           </form>
 
           <table>
@@ -481,7 +607,6 @@ function App() {
                   <td>{formatCurrency(row.highRisk)}</td>
                   <td>{formatCurrency(row.liquid)}</td>
                   <td>
-                    <button onClick={() => { setEditingSnapId(row.id); snapForm.reset({ snapshotDate: row.snapshotDate, lowRisk: row.lowRisk, mediumRisk: row.mediumRisk, highRisk: row.highRisk, liquid: row.liquid }); }}>Edit</button>
                     <button onClick={() => deleteMutation.mutate({ path: `/api/v1/monthly-snapshots/${row.id}` })}>Delete</button>
                   </td>
                 </tr>

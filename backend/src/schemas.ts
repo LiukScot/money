@@ -46,8 +46,12 @@ export const stylesSchema = z.object({
   styles: z.record(
     z.string(),
     z.object({
-      colorHex: z.string().optional().nullable(),
-      riskLevel: z.string().optional().nullable()
+      colorHex: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .optional()
+        .nullable(),
+      riskLevel: z.enum(["low", "medium", "high"]).optional().nullable()
     })
   )
 });

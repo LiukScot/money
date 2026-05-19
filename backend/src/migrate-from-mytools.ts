@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Database } from "bun:sqlite";
 import { openDb, runMigrations } from "./db.ts";
+import { inferType } from "./helpers.ts";
 
 type Args = {
   source: string;
@@ -42,16 +43,6 @@ function readSourceJson(db: Database, name: string): any | null {
   } catch {
     return null;
   }
-}
-
-function inferType(tipo: string, buyValue: number, pnl: number): string {
-  if (tipo === "nuovo vincolo") return buyValue >= 0 ? "buy" : "sell";
-  if (tipo === "cedola" || tipo === "interessi" || tipo === "cashback") return pnl >= 0 ? "return" : "fee";
-  if (tipo === "Variazione Valore") return pnl >= 0 ? "value-up" : "value-down";
-  if (buyValue >= 0 && pnl >= 0) return "buy";
-  if (buyValue >= 0 && pnl < 0) return "buy-loss";
-  if (buyValue < 0 && pnl >= 0) return "sell";
-  return "sell-loss";
 }
 
 function main() {

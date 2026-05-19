@@ -2,7 +2,7 @@ name: Dependabot lockfile sync
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
 
 permissions:
   contents: write

@@ -49,7 +49,7 @@ async function verifyPassword(
   storedHash: string
 ): Promise<{ ok: boolean; rehash?: string }> {
   if (isBcryptHash(storedHash)) {
-    const ok = bcrypt.compareSync(password, storedHash);
+    const ok = await bcrypt.compare(password, storedHash);
     if (!ok) return { ok: false };
     const rehash = await Bun.password.hash(password, { algorithm: "argon2id" });
     return { ok: true, rehash };
@@ -122,7 +122,7 @@ export function createApi(opts: ApiOptions) {
   function buildSessionCookie(sid: string): string {
     return cookie.serialize(env.SESSION_COOKIE_NAME, sid, {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
       maxAge: env.SESSION_TTL_SECONDS,
       secure: env.COOKIE_SECURE.toLowerCase() === "true"
@@ -132,7 +132,7 @@ export function createApi(opts: ApiOptions) {
   function clearSessionCookie(): string {
     return cookie.serialize(env.SESSION_COOKIE_NAME, "", {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
       maxAge: 0,
       secure: env.COOKIE_SECURE.toLowerCase() === "true"
@@ -436,7 +436,7 @@ export function createApi(opts: ApiOptions) {
     }
 
     if (pathname === "/api/v1/backup/json" && method === "GET") {
-      return buildJsonBackup(userId, corsHeaders);
+      return makeData(buildBackupPayload(userId), 200, corsHeaders);
     }
 
     if (pathname === "/api/v1/backup/json/import" && method === "POST") {
@@ -459,9 +459,7 @@ export function createApi(opts: ApiOptions) {
     }
 
     if (pathname === "/api/v1/backup/xlsx" && method === "GET") {
-      const jsonResp = buildJsonBackup(userId, corsHeaders);
-      const text = await jsonResp.text();
-      const payload = JSON.parse(text)?.data;
+      const payload = buildBackupPayload(userId);
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payload.transactions ?? []), "rawTransactions");
@@ -594,7 +592,7 @@ export function createApi(opts: ApiOptions) {
     return makeError("NOT_FOUND", "Route not found", 404, undefined, corsHeaders);
   }
 
-  function buildJsonBackup(userId: number, corsHeaders: Headers): Response {
+  function buildBackupPayload(userId: number) {
     const txRows = db
       .query(`SELECT * FROM transactions WHERE user_id = ? ORDER BY tx_date DESC, id DESC`)
       .all(userId) as Parameters<typeof normalizeTx>[0][];
@@ -618,43 +616,39 @@ export function createApi(opts: ApiOptions) {
       if (row.risk_level) assetRisks[row.asset] = String(row.risk_level);
     });
 
-    return makeData(
-      {
-        transactions: txRows.map((row) => ({
-          id: row.id,
-          date: row.tx_date,
-          asset: row.asset,
-          tipo: row.tipo,
-          type: row.derived_type,
-          buyValue: Number(row.buy_value),
-          pnl: Number(row.pnl),
-          currentValue: Number(row.current_value),
-          note: row.note ?? ""
-        })),
-        monthlyMovements: mmRows.map((row) => ({
-          id: row.id,
-          name: row.name,
-          direction: row.direction,
-          amount: Number(row.amount),
-          note: row.note ?? ""
-        })),
-        monthlySnapshots: snapRows.map((row) => ({
-          id: row.id,
-          date: row.snapshot_date,
-          low: Number(row.low_risk),
-          medium: Number(row.medium_risk),
-          high: Number(row.high_risk),
-          liquid: Number(row.liquid)
-        })),
-        assetColors,
-        assetRisks,
-        preferences: {
-          showZeroAssets: Boolean(prefRow?.show_zero_assets ?? 0)
-        }
-      },
-      200,
-      corsHeaders
-    );
+    return {
+      transactions: txRows.map((row) => ({
+        id: row.id,
+        date: row.tx_date,
+        asset: row.asset,
+        tipo: row.tipo,
+        type: row.derived_type,
+        buyValue: Number(row.buy_value),
+        pnl: Number(row.pnl),
+        currentValue: Number(row.current_value),
+        note: row.note ?? ""
+      })),
+      monthlyMovements: mmRows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        direction: row.direction,
+        amount: Number(row.amount),
+        note: row.note ?? ""
+      })),
+      monthlySnapshots: snapRows.map((row) => ({
+        id: row.id,
+        date: row.snapshot_date,
+        low: Number(row.low_risk),
+        medium: Number(row.medium_risk),
+        high: Number(row.high_risk),
+        liquid: Number(row.liquid)
+      })),
+      assetColors,
+      assetRisks,
+      preferences: {
+        showZeroAssets: Boolean(prefRow?.show_zero_assets ?? 0)
+      }
+    };
   }
 
   function wipeUserData(userId: number, includeStyles: boolean, includePrefs: boolean): void {
@@ -678,7 +672,7 @@ export function createApi(opts: ApiOptions) {
 
   function applyImport(userId: number, payload: ImportPayload): void {
     const insertTx = db.query(
-      `INSERT INTO transactions (id, user_id, tx_date, asset, tipo, derived_type, buy_value, pnl, current_value, note)
+      `INSERT OR IGNORE INTO transactions (id, user_id, tx_date, asset, tipo, derived_type, buy_value, pnl, current_value, note)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     payload.transactions.forEach((row) => {
@@ -697,21 +691,23 @@ export function createApi(opts: ApiOptions) {
     });
 
     const insertMm = db.query(
-      `INSERT INTO monthly_movements (id, user_id, name, direction, amount, note) VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT OR IGNORE INTO monthly_movements (id, user_id, name, direction, amount, note) VALUES (?, ?, ?, ?, ?, ?)`
     );
+    const validDirections = new Set(["income", "expense"]);
     payload.monthlyMovements.forEach((row) => {
+      const direction = validDirections.has(String(row.direction)) ? String(row.direction) : "income";
       insertMm.run(
         String(row.id ?? makeId("mm")),
         userId,
         String(row.name ?? ""),
-        String(row.direction ?? "income"),
+        direction,
         Math.abs(Number(row.amount ?? 0)),
         String(row.note ?? "")
       );
     });
 
     const insertSnap = db.query(
-      `INSERT INTO monthly_snapshots (id, user_id, snapshot_date, low_risk, medium_risk, high_risk, liquid)
+      `INSERT OR IGNORE INTO monthly_snapshots (id, user_id, snapshot_date, low_risk, medium_risk, high_risk, liquid)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
     payload.monthlySnapshots.forEach((row) => {

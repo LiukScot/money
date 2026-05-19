@@ -46,7 +46,6 @@ export const stylesResponse = apiEnvelopeSchema(stylesMapSchema);
 export const prefsResponse = apiEnvelopeSchema(prefsSchema);
 export const txListResponse = apiEnvelopeSchema(z.array(txSchema));
 export const mmListResponse = apiEnvelopeSchema(z.array(mmSchema));
-export const snapListResponse = apiEnvelopeSchema(z.array(snapSchema));
 
 export type Transaction = z.infer<typeof txSchema>;
 export type Movement = z.infer<typeof mmSchema>;

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const migrationStatements: string[] = [
   `CREATE TABLE IF NOT EXISTS users (
@@ -78,6 +78,7 @@ export const migrationStatements: string[] = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_tx_user_date ON transactions(user_id, tx_date DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_mm_user ON monthly_movements(user_id, direction)`,
+  `CREATE INDEX IF NOT EXISTS idx_mm_user_name ON monthly_movements(user_id, name, id)`,
   `CREATE INDEX IF NOT EXISTS idx_snap_user_date ON monthly_snapshots(user_id, snapshot_date DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_asset_style_user ON asset_styles(user_id, asset)`,
   `CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id)`,

@@ -455,9 +455,9 @@ function App() {
         <details>
           <summary>Account</summary>
           <form className="stack" onSubmit={changePasswordForm.handleSubmit((v) => changePasswordMutation.mutate(v))}>
-            <label>Current password<input type="password" {...changePasswordForm.register("currentPassword")} /></label>
-            <label>New password<input type="password" {...changePasswordForm.register("newPassword")} /></label>
-            <label>Confirm<input type="password" {...changePasswordForm.register("confirmPassword")} /></label>
+            <label htmlFor="cp-current">Current password<input id="cp-current" type="password" autoComplete="current-password" {...changePasswordForm.register("currentPassword")} /></label>
+            <label htmlFor="cp-new">New password<input id="cp-new" type="password" autoComplete="new-password" {...changePasswordForm.register("newPassword")} /></label>
+            <label htmlFor="cp-confirm">Confirm<input id="cp-confirm" type="password" autoComplete="new-password" {...changePasswordForm.register("confirmPassword")} /></label>
             <button type="submit" disabled={changePasswordMutation.isPending}>Change password</button>
             {changePasswordMutation.error && <p className="error">{String((changePasswordMutation.error as Error).message)}</p>}
           </form>

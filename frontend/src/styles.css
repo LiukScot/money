@@ -13,6 +13,7 @@
   --risk-low: var(--accent);
   --risk-medium: var(--accent-2);
   --risk-high: var(--danger);
+  --risk-liquid: #74c0fc;
 }
 
 * { box-sizing: border-box; }

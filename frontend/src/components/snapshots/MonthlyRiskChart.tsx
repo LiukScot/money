@@ -24,10 +24,10 @@ export function MonthlyRiskChart({ snapshots }: { snapshots: Snapshot[] }) {
   const data = {
     labels: asc.map((s) => s.snapshotDate),
     datasets: [
-      { label: "low", data: asc.map((s) => s.lowRisk), backgroundColor: "#74c0fc" },
-      { label: "medium", data: asc.map((s) => s.mediumRisk), backgroundColor: "#faa2c1" },
-      { label: "high", data: asc.map((s) => s.highRisk), backgroundColor: "#e599f7" },
-      { label: "liquid", data: asc.map((s) => s.liquid), backgroundColor: "#51cf66" }
+      { label: "Low", data: asc.map((s) => s.lowRisk), backgroundColor: "#74c0fc" },
+      { label: "Medium", data: asc.map((s) => s.mediumRisk), backgroundColor: "#faa2c1" },
+      { label: "High", data: asc.map((s) => s.highRisk), backgroundColor: "#e599f7" },
+      { label: "Liquid", data: asc.map((s) => s.liquid), backgroundColor: "#51cf66" }
     ]
   };
   const options = {

@@ -7,6 +7,7 @@ import { create } from "zustand";
 import { apiEnvelopeSchema, apiFetch, formatCurrency } from "./lib";
 import { mmSchema, snapSchema, txSchema } from "./types";
 import { DashboardPanel } from "./components/dashboard/DashboardPanel";
+import { MonthlyRiskChart } from "./components/snapshots/MonthlyRiskChart";
 import { computePerAsset } from "./lib/dashboard";
 
 const TIPO_OPTIONS = ["nuovo vincolo", "cedola", "interessi", "cashback", "Variazione Valore"] as const;
@@ -586,6 +587,7 @@ function App() {
       {nav === "snapshots" && (
         <section className="panel">
           <h2>Monthly snapshots</h2>
+          <MonthlyRiskChart snapshots={snapQuery.data ?? []} />
           <form onSubmit={snapForm.handleSubmit((v) => snapMutation.mutate(v))}>
             <div className="form-grid">
               <label htmlFor="snap-date">Date<input id="snap-date" type="date" {...snapForm.register("snapshotDate")} /></label>

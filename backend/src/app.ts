@@ -77,9 +77,7 @@ export function createApi(opts: ApiOptions) {
     const headers = new Headers();
     const origin = req.headers.get("origin");
     if (origin) {
-      const requestOrigin = new URL(req.url).origin;
-      const isSameOrigin = origin === requestOrigin;
-      if (!isSameOrigin && !allowedOrigins.has(origin)) {
+      if (!allowedOrigins.has(origin)) {
         return makeError("ORIGIN_NOT_ALLOWED", `Origin ${origin} is not allowed`, 403);
       }
       headers.set("access-control-allow-origin", origin);
@@ -409,6 +407,7 @@ export function createApi(opts: ApiOptions) {
           if (!asset.trim()) continue;
           insert.run(userId, asset.trim(), style.colorHex ?? null, style.riskLevel ?? null);
         }
+        insert.finalize();
       });
       tx();
       return makeData({ ok: true }, 200, corsHeaders);
@@ -496,14 +495,22 @@ export function createApi(opts: ApiOptions) {
       let workbook: XLSX.WorkBook | null = null;
       const contentType = req.headers.get("content-type") ?? "";
 
+      const MAX_XLSX_BYTES = 10 * 1024 * 1024;
       if (contentType.includes("multipart/form-data")) {
         const form = await req.formData();
         const file = form.get("file");
         if (!(file instanceof File)) {
           return makeError("MISSING_FILE", "Missing uploaded file in 'file' field", 400, undefined, corsHeaders);
         }
+        if (file.size > MAX_XLSX_BYTES) {
+          return makeError("FILE_TOO_LARGE", "File exceeds 10 MB limit", 400, undefined, corsHeaders);
+        }
         const arr = await file.arrayBuffer();
-        workbook = XLSX.read(Buffer.from(arr), { type: "buffer" });
+        try {
+          workbook = XLSX.read(Buffer.from(arr), { type: "buffer" });
+        } catch {
+          return makeError("INVALID_FILE", "Could not parse file as XLSX", 400, undefined, corsHeaders);
+        }
       } else {
         const payload = (await req.json().catch(() => null)) as { base64?: string } | null;
         if (!payload?.base64 || typeof payload.base64 !== "string") {
@@ -515,7 +522,15 @@ export function createApi(opts: ApiOptions) {
             corsHeaders
           );
         }
-        workbook = XLSX.read(Buffer.from(payload.base64, "base64"), { type: "buffer" });
+        const rawBytes = Buffer.from(payload.base64, "base64");
+        if (rawBytes.byteLength > MAX_XLSX_BYTES) {
+          return makeError("FILE_TOO_LARGE", "File exceeds 10 MB limit", 400, undefined, corsHeaders);
+        }
+        try {
+          workbook = XLSX.read(rawBytes, { type: "buffer" });
+        } catch {
+          return makeError("INVALID_FILE", "Could not parse file as XLSX", 400, undefined, corsHeaders);
+        }
       }
 
       const txSheet = workbook.Sheets["rawTransactions"];
@@ -535,13 +550,15 @@ export function createApi(opts: ApiOptions) {
       const assetColors: Record<string, string> = {};
       const assetRisks: Record<string, string> = {};
 
+      const validColorHex = /^#[0-9a-fA-F]{6}$/;
+      const validRiskLevels = new Set(["low", "medium", "high"]);
       styleRows.forEach((row) => {
         const asset = String(row.asset ?? "").trim();
         if (!asset) return;
         const colorHex = String(row.colorHex ?? "").trim();
         const riskLevel = String(row.riskLevel ?? "").trim();
-        if (colorHex) assetColors[asset] = colorHex;
-        if (riskLevel) assetRisks[asset] = riskLevel;
+        if (colorHex && validColorHex.test(colorHex)) assetColors[asset] = colorHex;
+        if (riskLevel && validRiskLevels.has(riskLevel)) assetRisks[asset] = riskLevel;
       });
 
       const prefRow = prefRows[0] ?? {};
@@ -689,6 +706,7 @@ export function createApi(opts: ApiOptions) {
       const note = String(row.note ?? "");
       insertTx.run(id, userId, txDate, asset, tipo, derivedType, buyValue, pnl, currentValue, note);
     });
+    insertTx.finalize();
 
     const insertMm = db.query(
       `INSERT OR IGNORE INTO monthly_movements (id, user_id, name, direction, amount, note) VALUES (?, ?, ?, ?, ?, ?)`
@@ -705,6 +723,7 @@ export function createApi(opts: ApiOptions) {
         String(row.note ?? "")
       );
     });
+    insertMm.finalize();
 
     const insertSnap = db.query(
       `INSERT OR IGNORE INTO monthly_snapshots (id, user_id, snapshot_date, low_risk, medium_risk, high_risk, liquid)
@@ -721,6 +740,7 @@ export function createApi(opts: ApiOptions) {
         Number(row.liquid ?? 0)
       );
     });
+    insertSnap.finalize();
 
     if (payload.replaceStyles) {
       const insertStyle = db.query(
@@ -739,6 +759,7 @@ export function createApi(opts: ApiOptions) {
           payload.assetRisks[asset] ?? null
         )
       );
+      insertStyle.finalize();
     }
 
     if (payload.replacePrefs) {

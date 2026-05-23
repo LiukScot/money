@@ -54,8 +54,8 @@ $env_candidates = [
 ];
 load_env_files($env_candidates);
 
-// Session login only; users can self-register when enabled.
-$ALLOW_SIGNUP = true; // allow self-registration
+// Session login only; self-registration is disabled.
+$ALLOW_SIGNUP = false;
 $FILES_TABLE = 'files';
 
 // ---- No edits needed below unless you want to customize behavior ----
@@ -314,7 +314,8 @@ function connect_db(string $filesTable): PDO
             ]
         );
     } catch (Throwable $e) {
-        respond(500, ['error' => 'db connect failed', 'detail' => $e->getMessage()]);
+        error_log('[mymoney] db connect failed: ' . $e->getMessage());
+        respond(500, ['error' => 'db connect failed']);
     }
     $db->exec('PRAGMA foreign_keys = ON');
     ensure_tables($db, $filesTable);
@@ -343,7 +344,7 @@ function send_session_cookie($isSecure, int $lifetime)
     }
     if ($isSecure)
         $parts[] = "Secure";
-    $parts[] = "SameSite=Lax";
+    $parts[] = "SameSite=Strict";
 
     // Use true to REPLACE any previous Set-Cookie headers
     header("Set-Cookie: " . implode('; ', $parts), true);
@@ -396,8 +397,12 @@ if (preg_match('#/api(?:/files)?/register/?$#', $rawUri)) {
     $name = trim($body['name'] ?? '');
     if ($email === '' || $password === '')
         respond(400, ['error' => 'email and password required']);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 254)
+        respond(400, ['error' => 'invalid email']);
     if (strlen($password) < 8)
         respond(400, ['error' => 'password too short']);
+    if (strlen($password) > 72)
+        respond(400, ['error' => 'password too long']);
     $stmt = $db->prepare("SELECT id FROM users WHERE email=? LIMIT 1");
     $stmt->execute([$email]);
     if ($stmt->fetch())
@@ -436,10 +441,10 @@ if (preg_match('#/api(?:/files)?/login/?$#', $rawUri)) {
             'name' => $user['name'],
             'role' => $user['role'],
             'session_name' => session_name(),
-            'session_id' => session_id(),
         ]);
     } catch (Throwable $e) {
-        respond(500, ['error' => 'login failed', 'detail' => $e->getMessage()]);
+        error_log('[mymoney] login failed: ' . $e->getMessage());
+        respond(500, ['error' => 'login failed']);
     }
 }
 

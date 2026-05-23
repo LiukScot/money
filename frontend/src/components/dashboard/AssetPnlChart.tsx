@@ -12,6 +12,12 @@ import { formatCurrency } from "../../lib";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
+function token(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
 export function AssetPnlChart({ visibleAssets }: { visibleAssets: AssetStats[] }) {
   if (visibleAssets.length === 0) {
     return (
@@ -21,13 +27,15 @@ export function AssetPnlChart({ visibleAssets }: { visibleAssets: AssetStats[] }
     );
   }
   const sorted = [...visibleAssets].sort((a, b) => b.pnl - a.pnl);
+  const colorPositive = token("--risk-low", "#7ee8a5");
+  const colorNegative = token("--risk-high", "#ff7b96");
   const data = {
     labels: sorted.map((s) => s.asset),
     datasets: [
       {
         label: "PnL",
         data: sorted.map((s) => s.pnl),
-        backgroundColor: sorted.map((s) => (s.pnl >= 0 ? "#7ee8a5" : "#ff7b96"))
+        backgroundColor: sorted.map((s) => (s.pnl >= 0 ? colorPositive : colorNegative))
       }
     ]
   };

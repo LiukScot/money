@@ -40,7 +40,8 @@ function readSourceJson(db: Database, name: string): any | null {
   if (!row?.data) return null;
   try {
     return JSON.parse(row.data);
-  } catch {
+  } catch (err) {
+    console.error(`[migrate] could not parse JSON for key "${name}":`, err);
     return null;
   }
 }

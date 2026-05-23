@@ -77,7 +77,9 @@ export function createApi(opts: ApiOptions) {
     const headers = new Headers();
     const origin = req.headers.get("origin");
     if (origin) {
-      if (!allowedOrigins.has(origin)) {
+      const requestOrigin = new URL(req.url).origin;
+      const isSameOrigin = origin === requestOrigin;
+      if (!isSameOrigin && !allowedOrigins.has(origin)) {
         return makeError("ORIGIN_NOT_ALLOWED", `Origin ${origin} is not allowed`, 403);
       }
       headers.set("access-control-allow-origin", origin);

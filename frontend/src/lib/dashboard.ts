@@ -62,9 +62,11 @@ export function computePerAsset(
   });
 }
 
+const NEAR_ZERO_THRESHOLD = 0.0001;
+
 export function filterVisibleAssets(stats: readonly AssetStats[], showZero: boolean): AssetStats[] {
   if (showZero) return [...stats];
-  return stats.filter((s) => Math.abs(s.current) > 0.0001);
+  return stats.filter((s) => Math.abs(s.current) > NEAR_ZERO_THRESHOLD);
 }
 
 export function cycleRisk(current: RiskLevel | null): RiskLevel {

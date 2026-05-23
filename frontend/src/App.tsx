@@ -348,10 +348,14 @@ function App() {
 
   const deleteMutation = useMutation({
     mutationFn: async ({ path }: { path: string }) => apiFetch(path, { method: "DELETE" }, (raw) => apiEnvelopeSchema(z.object({ ok: z.boolean() })).parse(raw).data),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      await queryClient.invalidateQueries({ queryKey: ["movements"] });
-      await queryClient.invalidateQueries({ queryKey: ["snapshots"] });
+    onSuccess: async (_data, { path }) => {
+      if (path.startsWith("/api/v1/transactions/")) {
+        await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      } else if (path.startsWith("/api/v1/monthly-movements/")) {
+        await queryClient.invalidateQueries({ queryKey: ["movements"] });
+      } else if (path.startsWith("/api/v1/monthly-snapshots/")) {
+        await queryClient.invalidateQueries({ queryKey: ["snapshots"] });
+      }
     }
   });
 
@@ -654,7 +658,7 @@ function App() {
 
             <article className="stack">
               <h3>Backup</h3>
-              <button onClick={doExportJson}>Export JSON</button>
+              <button onClick={() => doExportJson().catch((err) => alert((err as Error).message))}>Export JSON</button>
               <label className="file-input">Import JSON<input type="file" accept=".json" onChange={(e) => { const file = e.target.files?.[0]; if (file) doImportJson(file).catch((err) => alert((err as Error).message)); }} /></label>
               <button onClick={() => doExportXlsx().catch((err) => alert((err as Error).message))}>Export XLSX</button>
               <label className="file-input">Import XLSX<input type="file" accept=".xlsx,.xls" onChange={(e) => { const file = e.target.files?.[0]; if (file) doImportXlsx(file).catch((err) => alert((err as Error).message)); }} /></label>

@@ -24,7 +24,7 @@ ENV HOST=0.0.0.0 \
 EXPOSE 8001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8001/ || exit 1
+  CMD bun --eval "const r=await fetch('http://localhost:8001/');process.exit(r.ok?0:1)"
 
 USER bun
 CMD ["bun", "--cwd", "backend", "src/server.ts"]

@@ -21,6 +21,8 @@ data/
 
 # editor/system
 .DS_Store
+Thumbs.db
+desktop.ini
 .vscode/
 .idea/
 .claude/

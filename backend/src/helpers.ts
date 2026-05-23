@@ -4,6 +4,7 @@ export function setSecurityHeaders(h: Headers): void {
   h.set("x-content-type-options", "nosniff");
   h.set("x-frame-options", "DENY");
   h.set("referrer-policy", "no-referrer");
+  h.set("strict-transport-security", "max-age=63072000; includeSubDomains");
   h.set(
     "content-security-policy",
     "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"

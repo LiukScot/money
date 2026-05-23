@@ -2,7 +2,8 @@ import { z } from "zod";
 
 const isoDate = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
+  .refine((v) => !isNaN(Date.parse(v)), "Invalid calendar date");
 
 export const loginSchema = z.object({
   email: z.string().email().max(254),
@@ -43,17 +44,19 @@ export const snapshotSchema = z.object({
 });
 
 export const stylesSchema = z.object({
-  styles: z.record(
-    z.string(),
-    z.object({
-      colorHex: z
-        .string()
-        .regex(/^#[0-9a-fA-F]{6}$/)
-        .optional()
-        .nullable(),
-      riskLevel: z.enum(["low", "medium", "high"]).optional().nullable()
-    })
-  )
+  styles: z
+    .record(
+      z.string(),
+      z.object({
+        colorHex: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional()
+          .nullable(),
+        riskLevel: z.enum(["low", "medium", "high"]).optional().nullable()
+      })
+    )
+    .refine((v) => Object.keys(v).length <= 500, "Too many style entries (max 500)")
 });
 
 export const prefsSchema = z.object({ showZeroAssets: z.boolean() });

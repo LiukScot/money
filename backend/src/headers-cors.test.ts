@@ -79,7 +79,7 @@ describe("CORS handling", () => {
     expect(res.headers.get("vary")).toBe("Origin");
   });
 
-  test("treats same-origin as allowed even when not in allow-list", async () => {
+  test("accepts same-origin request even when origin is not in allow-list", async () => {
     const ctx = createTestApi();
     const res = await ctx.api.fetch(
       new Request("http://test/api/v1/auth/session", {
@@ -87,7 +87,8 @@ describe("CORS handling", () => {
         headers: { origin: "http://test" }
       })
     );
-    expect(res.status).toBe(200);
+    expect(res.status).not.toBe(403);
+    expect(res.headers.get("access-control-allow-origin")).toBe("http://test");
   });
 });
 

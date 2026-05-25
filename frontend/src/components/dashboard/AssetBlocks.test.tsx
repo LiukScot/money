@@ -60,6 +60,6 @@ describe("AssetBlocks", () => {
       />
     );
     const block = screen.getByTestId("asset-block-DOWN");
-    expect(block.querySelector(".asset-block__pnl--down")).toBeTruthy();
+    expect(block.querySelector('[data-pnl="down"]')).toBeTruthy();
   });
 });

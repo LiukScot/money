@@ -7,7 +7,7 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 export function AssetAllocationChart({ visibleAssets }: { visibleAssets: AssetStats[] }) {
   if (visibleAssets.length === 0) {
     return (
-      <p className="dashboard-empty" data-testid="allocation-chart-empty">
+      <p className="text-sm text-muted-foreground my-2" data-testid="allocation-chart-empty">
         No allocation data.
       </p>
     );
@@ -23,7 +23,7 @@ export function AssetAllocationChart({ visibleAssets }: { visibleAssets: AssetSt
     ]
   };
   return (
-    <div className="chart-wrap" data-testid="allocation-chart">
+    <div className="max-w-[420px] mt-3.5" data-testid="allocation-chart">
       <Pie data={data} />
     </div>
   );

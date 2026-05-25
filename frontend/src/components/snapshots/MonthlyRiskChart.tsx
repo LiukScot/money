@@ -14,16 +14,14 @@ ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 function token(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return value || fallback;
 }
 
 export function MonthlyRiskChart({ snapshots }: { snapshots: Snapshot[] }) {
   if (snapshots.length === 0) {
     return (
-      <p className="dashboard-empty" data-testid="snapshot-chart-empty">
+      <p className="text-sm text-muted-foreground my-2" data-testid="snapshot-chart-empty">
         No snapshots to chart.
       </p>
     );
@@ -32,10 +30,10 @@ export function MonthlyRiskChart({ snapshots }: { snapshots: Snapshot[] }) {
   const data = {
     labels: asc.map((s) => s.snapshotDate),
     datasets: [
-      { label: "Low", data: asc.map((s) => s.lowRisk), backgroundColor: token("--risk-low", "#7ee8a5") },
-      { label: "Medium", data: asc.map((s) => s.mediumRisk), backgroundColor: token("--risk-medium", "#f9c777") },
-      { label: "High", data: asc.map((s) => s.highRisk), backgroundColor: token("--risk-high", "#ff7b96") },
-      { label: "Liquid", data: asc.map((s) => s.liquid), backgroundColor: token("--risk-liquid", "#74c0fc") }
+      { label: "Low", data: asc.map((s) => s.lowRisk), backgroundColor: token("--risk-low", "#34d399") },
+      { label: "Medium", data: asc.map((s) => s.mediumRisk), backgroundColor: token("--risk-medium", "#fbbf24") },
+      { label: "High", data: asc.map((s) => s.highRisk), backgroundColor: token("--risk-high", "#fb7185") },
+      { label: "Liquid", data: asc.map((s) => s.liquid), backgroundColor: token("--risk-liquid", "#60a5fa") }
     ]
   };
   const options = {
@@ -51,7 +49,7 @@ export function MonthlyRiskChart({ snapshots }: { snapshots: Snapshot[] }) {
     }
   };
   return (
-    <div className="chart-wrap" data-testid="snapshot-chart">
+    <div className="max-w-[420px] mt-3.5" data-testid="snapshot-chart">
       <Bar data={data} options={options} />
     </div>
   );

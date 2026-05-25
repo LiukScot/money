@@ -19,6 +19,7 @@ import { AssetBlocks } from "./AssetBlocks";
 import { AssetAllocationChart } from "./AssetAllocationChart";
 import { AssetPnlChart } from "./AssetPnlChart";
 import { ZeroAssetsToggle } from "./ZeroAssetsToggle";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
 
@@ -137,31 +138,37 @@ export function DashboardPanel() {
   };
 
   return (
-    <section className="panel">
-      <h2>Dashboard</h2>
-      <KpiCards kpis={kpis} />
+    <Card>
+      <CardHeader>
+        <CardTitle>Dashboard</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-6">
+        <KpiCards kpis={kpis} />
 
-      <div className="dashboard-controls">
-        <ZeroAssetsToggle
-          checked={prefs.showZeroAssets}
-          onChange={(next) => prefsMutation.mutate(next)}
-          disabled={prefsMutation.isPending}
-        />
-      </div>
-
-      <h3>Asset breakdown</h3>
-      <AssetBlocks visibleAssets={visibleAssets} stylesMap={stylesMap} onChangeStyle={handleStyleChange} />
-
-      <div className="dashboard-charts">
-        <div>
-          <h3>Allocation</h3>
-          <AssetAllocationChart visibleAssets={visibleAssets} />
+        <div className="flex gap-3 items-center flex-wrap">
+          <ZeroAssetsToggle
+            checked={prefs.showZeroAssets}
+            onChange={(next) => prefsMutation.mutate(next)}
+            disabled={prefsMutation.isPending}
+          />
         </div>
-        <div>
-          <h3>PnL per asset</h3>
-          <AssetPnlChart visibleAssets={visibleAssets} />
+
+        <div className="grid gap-3">
+          <h3 className="text-base font-medium m-0">Asset breakdown</h3>
+          <AssetBlocks visibleAssets={visibleAssets} stylesMap={stylesMap} onChangeStyle={handleStyleChange} />
         </div>
-      </div>
-    </section>
+
+        <div className="grid gap-3.5 grid-cols-[repeat(auto-fit,minmax(320px,1fr))]">
+          <div>
+            <h3 className="text-base font-medium m-0 mb-2">Allocation</h3>
+            <AssetAllocationChart visibleAssets={visibleAssets} />
+          </div>
+          <div>
+            <h3 className="text-base font-medium m-0 mb-2">PnL per asset</h3>
+            <AssetPnlChart visibleAssets={visibleAssets} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

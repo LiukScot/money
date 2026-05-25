@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,22 @@ import { mmSchema, snapSchema, txSchema } from "./types";
 import { DashboardPanel } from "./components/dashboard/DashboardPanel";
 import { MonthlyRiskChart } from "./components/snapshots/MonthlyRiskChart";
 import { computePerAsset } from "./lib/dashboard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const TIPO_OPTIONS = ["nuovo vincolo", "cedola", "interessi", "cashback", "Variazione Valore"] as const;
 const TIPO_PNL_ONLY = new Set<string>(["cedola", "interessi", "cashback", "Variazione Valore"]);
@@ -70,6 +86,15 @@ const snapFormSchema = z.object({
 const navItems = ["dashboard", "transactions", "movements", "snapshots", "settings"] as const;
 type NavItem = (typeof navItems)[number];
 
+function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
 function App() {
   const queryClient = useQueryClient();
   const { user, setUser } = useAuthStore();
@@ -77,6 +102,7 @@ function App() {
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [editingMmId, setEditingMmId] = useState<string | null>(null);
   const [styleJson, setStyleJson] = useState("{}");
+  const [accountOpen, setAccountOpen] = useState(false);
 
   const sessionQuery = useQuery({
     queryKey: ["session"],
@@ -139,7 +165,7 @@ function App() {
       txDate: new Date().toISOString().slice(0, 10),
       asset: "",
       tipo: "nuovo vincolo",
-      // reason: empty string renders placeholder; z.coerce.number maps "" → 0 at submit
+      // empty string renders placeholder in number input; z.coerce.number maps "" → 0 at submit
       buyValue: "" as unknown as number,
       pnl: "" as unknown as number,
       note: ""
@@ -203,7 +229,6 @@ function App() {
     defaultValues: {
       name: "",
       direction: "income",
-      // reason: empty string renders placeholder; z.coerce.number maps "" → 0 at submit
       amount: "" as unknown as number,
       note: ""
     }
@@ -211,7 +236,6 @@ function App() {
   const snapForm = useForm<z.infer<typeof snapFormSchema>>({
     defaultValues: {
       snapshotDate: new Date().toISOString().slice(0, 10),
-      // reason: empty string renders placeholder; z.coerce.number maps "" → 0 at submit
       liquid: "" as unknown as number
     }
   });
@@ -396,7 +420,7 @@ function App() {
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `mymoney-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `money-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -413,7 +437,7 @@ function App() {
     const blob = await res.blob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `mymoney-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.download = `money-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -428,221 +452,438 @@ function App() {
 
   if (!user) {
     return (
-      <main className="screen auth-screen">
-        <section className="auth-card">
-          <h1>myMoney</h1>
-          <p>Sign in to access your private money workspace.</p>
-          <form className="stack" onSubmit={loginForm.handleSubmit((values) => loginMutation.mutate(values))}>
-            <label htmlFor="login-email">
-              Email
-              <input id="login-email" type="email" autoComplete="email" {...loginForm.register("email")} />
-            </label>
-            <label htmlFor="login-password">
-              Password
-              <input id="login-password" type="password" autoComplete="current-password" {...loginForm.register("password")} />
-            </label>
-            <button type="submit" disabled={loginMutation.isPending}>{loginMutation.isPending ? "Signing in..." : "Sign in"}</button>
-            {loginMutation.error && <p className="error">{String((loginMutation.error as Error).message)}</p>}
-            <p className="hint">Signup is disabled. Use CLI provisioning.</p>
-          </form>
-        </section>
+      <main className="min-h-screen grid place-items-center p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <h1 className="m-0 text-2xl font-semibold">money</h1>
+            <p className="text-sm text-muted-foreground">Sign in to access your private money workspace.</p>
+          </CardHeader>
+          <CardContent>
+            <form className="grid gap-4" onSubmit={loginForm.handleSubmit((values) => loginMutation.mutate(values))}>
+              <Field id="login-email" label="Email">
+                <Input id="login-email" type="email" autoComplete="email" {...loginForm.register("email")} />
+              </Field>
+              <Field id="login-password" label="Password">
+                <Input id="login-password" type="password" autoComplete="current-password" {...loginForm.register("password")} />
+              </Field>
+              <Button type="submit" disabled={loginMutation.isPending}>
+                {loginMutation.isPending ? "Signing in..." : "Sign in"}
+              </Button>
+              {loginMutation.error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{String((loginMutation.error as Error).message)}</AlertDescription>
+                </Alert>
+              )}
+              <p className="text-sm text-muted-foreground">Signup is disabled. Use CLI provisioning.</p>
+            </form>
+          </CardContent>
+        </Card>
       </main>
     );
   }
 
   return (
-    <main className="screen app-screen">
-      <header className="app-header">
+    <main className="min-h-screen mx-auto max-w-[1300px] w-[96vw] grid gap-4 p-6">
+      <header className="flex justify-between items-start gap-5 flex-wrap">
         <div>
-          <h1>myMoney</h1>
-          <p>{user.email}</p>
+          <h1 className="text-3xl font-semibold m-0">money</h1>
+          <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
         </div>
-        <details>
-          <summary>Account</summary>
-          <form className="stack" onSubmit={changePasswordForm.handleSubmit((v) => changePasswordMutation.mutate(v))}>
-            <label htmlFor="cp-current">Current password<input id="cp-current" type="password" autoComplete="current-password" {...changePasswordForm.register("currentPassword")} /></label>
-            <label htmlFor="cp-new">New password<input id="cp-new" type="password" autoComplete="new-password" {...changePasswordForm.register("newPassword")} /></label>
-            <label htmlFor="cp-confirm">Confirm<input id="cp-confirm" type="password" autoComplete="new-password" {...changePasswordForm.register("confirmPassword")} /></label>
-            <button type="submit" disabled={changePasswordMutation.isPending}>Change password</button>
-            {changePasswordMutation.error && <p className="error">{String((changePasswordMutation.error as Error).message)}</p>}
-          </form>
-          <button onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>Log out</button>
-        </details>
+        <div className="relative">
+          <Button variant="outline" size="sm" onClick={() => setAccountOpen((o) => !o)} aria-expanded={accountOpen}>
+            Account
+          </Button>
+          {accountOpen && (
+            <div className="absolute right-0 top-full mt-2 z-20 w-80 rounded-lg border border-border bg-popover p-4 shadow-lg">
+              <form
+                className="grid gap-3"
+                onSubmit={changePasswordForm.handleSubmit((v) => changePasswordMutation.mutate(v))}
+              >
+                <Field id="cp-current" label="Current password">
+                  <Input id="cp-current" type="password" autoComplete="current-password" {...changePasswordForm.register("currentPassword")} />
+                </Field>
+                <Field id="cp-new" label="New password">
+                  <Input id="cp-new" type="password" autoComplete="new-password" {...changePasswordForm.register("newPassword")} />
+                </Field>
+                <Field id="cp-confirm" label="Confirm">
+                  <Input id="cp-confirm" type="password" autoComplete="new-password" {...changePasswordForm.register("confirmPassword")} />
+                </Field>
+                <Button type="submit" size="sm" disabled={changePasswordMutation.isPending}>
+                  Change password
+                </Button>
+                {changePasswordMutation.error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{String((changePasswordMutation.error as Error).message)}</AlertDescription>
+                  </Alert>
+                )}
+              </form>
+              <div className="mt-3 pt-3 border-t border-border">
+                <Button variant="outline" size="sm" onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>
+                  Log out
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </header>
 
-      <nav className="nav-grid">
+      <nav className="flex flex-wrap gap-2">
         {navItems.map((item) => (
-          <button key={item} className={item === nav ? "active" : ""} onClick={() => setNav(item)}>{item}</button>
+          <Button
+            key={item}
+            size="sm"
+            variant={item === nav ? "default" : "ghost"}
+            onClick={() => setNav(item)}
+          >
+            {item}
+          </Button>
         ))}
       </nav>
 
       {nav === "dashboard" && <DashboardPanel />}
 
       {nav === "transactions" && (
-        <section className="panel">
-          <h2>Transactions</h2>
-          <form onSubmit={txForm.handleSubmit((v) => txMutation.mutate(v))}>
-            <div className="form-grid">
-              <label htmlFor="tx-date">Date<input id="tx-date" type="date" {...txForm.register("txDate")} /></label>
-              <label htmlFor="tx-asset" className="combo">
-                Asset
-                <input
-                  id="tx-asset"
-                  type="text"
-                  autoComplete="off"
-                  placeholder={assetOptions.length > 0 ? "digita o scegli" : "es. revolut"}
-                  role="combobox"
-                  aria-expanded={assetComboOpen}
-                  aria-controls="tx-asset-combo-list"
-                  aria-activedescendant={assetComboOpen && assetFocusedIdx >= 0 ? `tx-asset-opt-${assetFocusedIdx}` : undefined}
-                  {...txForm.register("asset")}
-                  onFocus={() => setAssetComboOpen(true)}
-                  onBlur={() => window.setTimeout(() => setAssetComboOpen(false), 120)}
-                  onKeyDown={handleAssetKeyDown}
-                />
-                {assetComboOpen && visibleAssetOptions.length > 0 && (
-                  <ul id="tx-asset-combo-list" className="combo-list" role="listbox">
-                    {visibleAssetOptions.map((a, idx) => (
-                      <li key={a} id={`tx-asset-opt-${idx}`} role="option" aria-selected={assetFocusedIdx === idx}>
-                        <button
-                          type="button"
-                          className={"combo-item" + (assetFocusedIdx === idx ? " is-focused" : "")}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            selectAssetOption(a);
+        <Card>
+          <CardHeader>
+            <CardTitle>Transactions</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-6">
+            <form className="grid gap-4" onSubmit={txForm.handleSubmit((v) => txMutation.mutate(v))}>
+              <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+                <Field id="tx-date" label="Date">
+                  <Input id="tx-date" type="date" {...txForm.register("txDate")} />
+                </Field>
+                <div className="grid gap-1.5 relative">
+                  <Label htmlFor="tx-asset">Asset</Label>
+                  <Input
+                    id="tx-asset"
+                    type="text"
+                    autoComplete="off"
+                    placeholder={assetOptions.length > 0 ? "digita o scegli" : "es. revolut"}
+                    role="combobox"
+                    aria-expanded={assetComboOpen}
+                    aria-controls="tx-asset-combo-list"
+                    aria-activedescendant={assetComboOpen && assetFocusedIdx >= 0 ? `tx-asset-opt-${assetFocusedIdx}` : undefined}
+                    {...txForm.register("asset")}
+                    onFocus={() => setAssetComboOpen(true)}
+                    onBlur={() => window.setTimeout(() => setAssetComboOpen(false), 120)}
+                    onKeyDown={handleAssetKeyDown}
+                  />
+                  {assetComboOpen && visibleAssetOptions.length > 0 && (
+                    <ul
+                      id="tx-asset-combo-list"
+                      role="listbox"
+                      className="absolute inset-x-0 top-full mt-1 z-20 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg"
+                    >
+                      {visibleAssetOptions.map((a, idx) => (
+                        <li key={a} id={`tx-asset-opt-${idx}`} role="option" aria-selected={assetFocusedIdx === idx}>
+                          <button
+                            type="button"
+                            className={`w-full text-left rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground ${assetFocusedIdx === idx ? "bg-accent text-accent-foreground" : ""}`}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectAssetOption(a);
+                            }}
+                          >
+                            {a}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <Field id="tx-tipo" label="Tipo">
+                  <Controller
+                    control={txForm.control}
+                    name="tipo"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="tx-tipo">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIPO_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                {showBuyValue && (
+                  <Field id="tx-buyValue" label="Buy value">
+                    <Input id="tx-buyValue" type="number" step="0.01" placeholder="0" {...txForm.register("buyValue")} />
+                  </Field>
+                )}
+                {showPnl && (
+                  <Field id="tx-pnl" label="PnL">
+                    <Input id="tx-pnl" type="number" step="0.01" placeholder="0" {...txForm.register("pnl")} />
+                  </Field>
+                )}
+                <Field id="tx-note" label="Note">
+                  <Textarea id="tx-note" {...txForm.register("note")} />
+                </Field>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button type="submit">{editingTxId ? "Update" : "Add"}</Button>
+                {editingTxId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingTxId(null);
+                      txForm.reset({
+                        txDate: new Date().toISOString().slice(0, 10),
+                        asset: "",
+                        tipo: "nuovo vincolo",
+                        buyValue: "" as unknown as number,
+                        pnl: "" as unknown as number,
+                        note: ""
+                      });
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Asset</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Current</TableHead>
+                  <TableHead>PnL</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(txQuery.data ?? []).map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{row.txDate}</TableCell>
+                    <TableCell>{row.asset}</TableCell>
+                    <TableCell>{row.tipo}</TableCell>
+                    <TableCell>{formatCurrency(row.currentValue)}</TableCell>
+                    <TableCell>{formatCurrency(row.pnl)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingTxId(row.id);
+                            txForm.reset({
+                              txDate: row.txDate,
+                              asset: row.asset,
+                              tipo: row.tipo,
+                              buyValue: row.buyValue,
+                              pnl: row.pnl,
+                              note: row.note
+                            });
                           }}
                         >
-                          {a}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </label>
-              <label htmlFor="tx-tipo">
-                Tipo
-                <select id="tx-tipo" {...txForm.register("tipo")}>
-                  {TIPO_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </label>
-              {showBuyValue && <label htmlFor="tx-buyValue">Buy value<input id="tx-buyValue" type="number" step="0.01" placeholder="0" {...txForm.register("buyValue")} /></label>}
-              {showPnl && <label htmlFor="tx-pnl">PnL<input id="tx-pnl" type="number" step="0.01" placeholder="0" {...txForm.register("pnl")} /></label>}
-              <label htmlFor="tx-note">Note<textarea id="tx-note" {...txForm.register("note")} /></label>
-            </div>
-            <div className="row-actions">
-              <button type="submit">{editingTxId ? "Update" : "Add"}</button>
-              {editingTxId && <button type="button" onClick={() => { setEditingTxId(null); txForm.reset({ txDate: new Date().toISOString().slice(0, 10), asset: "", tipo: "nuovo vincolo", buyValue: "" as unknown as number, pnl: "" as unknown as number, note: "" }); }}>Cancel</button>}
-            </div>
-          </form>
-
-          <table>
-            <thead><tr><th>Date</th><th>Asset</th><th>Tipo</th><th>Current</th><th>PnL</th><th>Actions</th></tr></thead>
-            <tbody>
-              {(txQuery.data ?? []).map((row) => (
-                <tr key={row.id}>
-                  <td>{row.txDate}</td>
-                  <td>{row.asset}</td>
-                  <td>{row.tipo}</td>
-                  <td>{formatCurrency(row.currentValue)}</td>
-                  <td>{formatCurrency(row.pnl)}</td>
-                  <td>
-                    <button onClick={() => { setEditingTxId(row.id); txForm.reset({ txDate: row.txDate, asset: row.asset, tipo: row.tipo, buyValue: row.buyValue, pnl: row.pnl, note: row.note }); }}>Edit</button>
-                    <button onClick={() => deleteMutation.mutate({ path: `/api/v1/transactions/${row.id}` })}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteMutation.mutate({ path: `/api/v1/transactions/${row.id}` })}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
       {nav === "movements" && (
-        <section className="panel">
-          <h2>Monthly movements</h2>
-          <form onSubmit={mmForm.handleSubmit((v) => mmMutation.mutate(v))}>
-            <div className="form-grid">
-              <label htmlFor="mm-name">Name<input id="mm-name" type="text" {...mmForm.register("name")} /></label>
-              <label htmlFor="mm-direction">Direction<select id="mm-direction" {...mmForm.register("direction")}><option value="income">income</option><option value="expense">expense</option></select></label>
-              <label htmlFor="mm-amount">Amount<input id="mm-amount" type="number" step="0.01" placeholder="0" {...mmForm.register("amount")} /></label>
-              <label htmlFor="mm-note">Note<textarea id="mm-note" {...mmForm.register("note")} /></label>
-            </div>
-            <div className="row-actions"><button type="submit">{editingMmId ? "Update" : "Add"}</button>{editingMmId && <button type="button" onClick={() => { setEditingMmId(null); mmForm.reset({ name: "", direction: "income", amount: "" as unknown as number, note: "" }); }}>Cancel</button>}</div>
-          </form>
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly movements</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-6">
+            <form className="grid gap-4" onSubmit={mmForm.handleSubmit((v) => mmMutation.mutate(v))}>
+              <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+                <Field id="mm-name" label="Name">
+                  <Input id="mm-name" type="text" {...mmForm.register("name")} />
+                </Field>
+                <Field id="mm-direction" label="Direction">
+                  <Controller
+                    control={mmForm.control}
+                    name="direction"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={(v) => field.onChange(v as "income" | "expense")}>
+                        <SelectTrigger id="mm-direction">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="income">income</SelectItem>
+                          <SelectItem value="expense">expense</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                <Field id="mm-amount" label="Amount">
+                  <Input id="mm-amount" type="number" step="0.01" placeholder="0" {...mmForm.register("amount")} />
+                </Field>
+                <Field id="mm-note" label="Note">
+                  <Textarea id="mm-note" {...mmForm.register("note")} />
+                </Field>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button type="submit">{editingMmId ? "Update" : "Add"}</Button>
+                {editingMmId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingMmId(null);
+                      mmForm.reset({ name: "", direction: "income", amount: "" as unknown as number, note: "" });
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
 
-          <table>
-            <thead><tr><th>Name</th><th>Direction</th><th>Amount</th><th>Actions</th></tr></thead>
-            <tbody>
-              {(mmQuery.data ?? []).map((row) => (
-                <tr key={row.id}>
-                  <td>{row.name}</td>
-                  <td>{row.direction}</td>
-                  <td>{formatCurrency(row.amount)}</td>
-                  <td>
-                    <button onClick={() => { setEditingMmId(row.id); mmForm.reset({ name: row.name, direction: row.direction, amount: row.amount, note: row.note }); }}>Edit</button>
-                    <button onClick={() => deleteMutation.mutate({ path: `/api/v1/monthly-movements/${row.id}` })}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Direction</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(mmQuery.data ?? []).map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{row.name}</TableCell>
+                    <TableCell>{row.direction}</TableCell>
+                    <TableCell>{formatCurrency(row.amount)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingMmId(row.id);
+                            mmForm.reset({ name: row.name, direction: row.direction, amount: row.amount, note: row.note });
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteMutation.mutate({ path: `/api/v1/monthly-movements/${row.id}` })}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
       {nav === "snapshots" && (
-        <section className="panel">
-          <h2>Monthly snapshots</h2>
-          <MonthlyRiskChart snapshots={snapQuery.data ?? []} />
-          <form onSubmit={snapForm.handleSubmit((v) => snapMutation.mutate(v))}>
-            <div className="form-grid">
-              <label htmlFor="snap-date">Date<input id="snap-date" type="date" {...snapForm.register("snapshotDate")} /></label>
-              <label htmlFor="snap-liquid">Liquid<input id="snap-liquid" type="number" step="0.01" placeholder="0" {...snapForm.register("liquid")} /></label>
-            </div>
-            <div className="row-actions">
-              <button type="submit" disabled={!txQuery.isSuccess || !stylesQuery.isSuccess}>Add</button>
-            </div>
-          </form>
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly snapshots</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-6">
+            <MonthlyRiskChart snapshots={snapQuery.data ?? []} />
+            <form className="grid gap-4" onSubmit={snapForm.handleSubmit((v) => snapMutation.mutate(v))}>
+              <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+                <Field id="snap-date" label="Date">
+                  <Input id="snap-date" type="date" {...snapForm.register("snapshotDate")} />
+                </Field>
+                <Field id="snap-liquid" label="Liquid">
+                  <Input id="snap-liquid" type="number" step="0.01" placeholder="0" {...snapForm.register("liquid")} />
+                </Field>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button type="submit" disabled={!txQuery.isSuccess || !stylesQuery.isSuccess}>Add</Button>
+              </div>
+            </form>
 
-          <table>
-            <thead><tr><th>Date</th><th>Low</th><th>Medium</th><th>High</th><th>Liquid</th><th>Actions</th></tr></thead>
-            <tbody>
-              {(snapQuery.data ?? []).map((row) => (
-                <tr key={row.id}>
-                  <td>{row.snapshotDate}</td>
-                  <td>{formatCurrency(row.lowRisk)}</td>
-                  <td>{formatCurrency(row.mediumRisk)}</td>
-                  <td>{formatCurrency(row.highRisk)}</td>
-                  <td>{formatCurrency(row.liquid)}</td>
-                  <td>
-                    <button onClick={() => deleteMutation.mutate({ path: `/api/v1/monthly-snapshots/${row.id}` })}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Low</TableHead>
+                  <TableHead>Medium</TableHead>
+                  <TableHead>High</TableHead>
+                  <TableHead>Liquid</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(snapQuery.data ?? []).map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{row.snapshotDate}</TableCell>
+                    <TableCell>{formatCurrency(row.lowRisk)}</TableCell>
+                    <TableCell>{formatCurrency(row.mediumRisk)}</TableCell>
+                    <TableCell>{formatCurrency(row.highRisk)}</TableCell>
+                    <TableCell>{formatCurrency(row.liquid)}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteMutation.mutate({ path: `/api/v1/monthly-snapshots/${row.id}` })}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
       {nav === "settings" && (
-        <section className="panel">
-          <h2>Settings</h2>
-          <div className="settings-grid">
-            <article className="stack">
-              <h3>Preferences</h3>
-              <label>
-                <input
-                  type="checkbox"
+        <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Preferences</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
                   checked={Boolean(prefsQuery.data?.showZeroAssets)}
-                  onChange={(e) => prefsMutation.mutate(e.target.checked)}
+                  onCheckedChange={(checked) => prefsMutation.mutate(checked === true)}
                 />
                 Show zero-value assets
-              </label>
-            </article>
+              </Label>
+            </CardContent>
+          </Card>
 
-            <article className="stack">
-              <h3>Asset styles (JSON)</h3>
-              <button onClick={() => setStyleJson(JSON.stringify(stylesQuery.data ?? {}, null, 2))}>Load current</button>
-              <textarea rows={10} value={styleJson} onChange={(e) => setStyleJson(e.target.value)} />
-              <button
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Asset styles (JSON)</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              <Button variant="outline" size="sm" onClick={() => setStyleJson(JSON.stringify(stylesQuery.data ?? {}, null, 2))}>
+                Load current
+              </Button>
+              <Textarea rows={10} value={styleJson} onChange={(e) => setStyleJson(e.target.value)} />
+              <Button
+                size="sm"
                 onClick={() => {
                   try {
                     const parsed = JSON.parse(styleJson);
@@ -653,23 +894,65 @@ function App() {
                 }}
               >
                 Save styles
-              </button>
-            </article>
+              </Button>
+            </CardContent>
+          </Card>
 
-            <article className="stack">
-              <h3>Backup</h3>
-              <button onClick={() => doExportJson().catch((err) => alert((err as Error).message))}>Export JSON</button>
-              <label className="file-input">Import JSON<input type="file" accept=".json" onChange={(e) => { const file = e.target.files?.[0]; if (file) doImportJson(file).catch((err) => alert((err as Error).message)); }} /></label>
-              <button onClick={() => doExportXlsx().catch((err) => alert((err as Error).message))}>Export XLSX</button>
-              <label className="file-input">Import XLSX<input type="file" accept=".xlsx,.xls" onChange={(e) => { const file = e.target.files?.[0]; if (file) doImportXlsx(file).catch((err) => alert((err as Error).message)); }} /></label>
-            </article>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Backup</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              <Button variant="outline" size="sm" onClick={() => doExportJson().catch((err) => alert((err as Error).message))}>
+                Export JSON
+              </Button>
+              <Label className="grid gap-1.5 rounded-md border border-dashed border-border p-3 cursor-pointer text-sm">
+                Import JSON
+                <Input
+                  type="file"
+                  accept=".json"
+                  className="border-0 p-0 h-auto file:mr-2"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) doImportJson(file).catch((err) => alert((err as Error).message));
+                  }}
+                />
+              </Label>
+              <Button variant="outline" size="sm" onClick={() => doExportXlsx().catch((err) => alert((err as Error).message))}>
+                Export XLSX
+              </Button>
+              <Label className="grid gap-1.5 rounded-md border border-dashed border-border p-3 cursor-pointer text-sm">
+                Import XLSX
+                <Input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="border-0 p-0 h-auto file:mr-2"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) doImportXlsx(file).catch((err) => alert((err as Error).message));
+                  }}
+                />
+              </Label>
+            </CardContent>
+          </Card>
 
-            <article className="stack">
-              <h3>Danger zone</h3>
-              <button className="danger" onClick={() => { if (confirm("Delete all myMoney data for this account?")) purgeMutation.mutate(); }}>Purge all data</button>
-            </article>
-          </div>
-        </section>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base text-destructive">Danger zone</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  if (confirm("Delete all money data for this account?")) purgeMutation.mutate();
+                }}
+              >
+                Purge all data
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </main>
   );

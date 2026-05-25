@@ -21,14 +21,14 @@ function token(name: string, fallback: string): string {
 export function AssetPnlChart({ visibleAssets }: { visibleAssets: AssetStats[] }) {
   if (visibleAssets.length === 0) {
     return (
-      <p className="dashboard-empty" data-testid="pnl-chart-empty">
+      <p className="text-sm text-muted-foreground my-2" data-testid="pnl-chart-empty">
         No PnL data to chart.
       </p>
     );
   }
   const sorted = [...visibleAssets].sort((a, b) => b.pnl - a.pnl);
-  const colorPositive = token("--risk-low", "#7ee8a5");
-  const colorNegative = token("--risk-high", "#ff7b96");
+  const colorPositive = token("--risk-low", "#34d399");
+  const colorNegative = token("--risk-high", "#fb7185");
   const data = {
     labels: sorted.map((s) => s.asset),
     datasets: [
@@ -50,7 +50,7 @@ export function AssetPnlChart({ visibleAssets }: { visibleAssets: AssetStats[] }
     }
   };
   return (
-    <div className="chart-wrap" data-testid="pnl-chart">
+    <div className="max-w-[420px] mt-3.5" data-testid="pnl-chart">
       <Bar data={data} options={options} />
     </div>
   );

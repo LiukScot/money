@@ -20,7 +20,7 @@ test.describe("auth flows", () => {
 
   test("successful login lands on dashboard", async ({ page }) => {
     await loginUi(page);
-    await expect(page.getByRole("button", { name: "dashboard" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "dashboard" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   });
 

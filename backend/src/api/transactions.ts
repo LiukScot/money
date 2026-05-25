@@ -7,17 +7,21 @@ import { txSchema } from "../schemas.ts";
 import { inferType, makeId, normalizeTx } from "../helpers.ts";
 import type { AppEnv } from "./types.ts";
 import { jsonData, jsonError, validateJson } from "./responses.ts";
+import { readPageBounds } from "./pagination.ts";
 
 export const transactionRoutes = new Hono<AppEnv>();
 
 transactionRoutes.get("/", (c) => {
   const db = c.get("db");
   const user = c.get("user");
+  const { limit, offset } = readPageBounds(c);
   const rows = getDrizzle(db)
     .select()
     .from(transactions)
     .where(eq(transactions.user_id, user.id))
     .orderBy(desc(transactions.tx_date), desc(transactions.id))
+    .limit(limit)
+    .offset(offset)
     .all() as Parameters<typeof normalizeTx>[0][];
   return jsonData(c, rows.map(normalizeTx));
 });

@@ -7,17 +7,21 @@ import { snapshotSchema } from "../schemas.ts";
 import { makeId, normalizeSnap } from "../helpers.ts";
 import type { AppEnv } from "./types.ts";
 import { jsonData, jsonError, validateJson } from "./responses.ts";
+import { readPageBounds } from "./pagination.ts";
 
 export const snapshotRoutes = new Hono<AppEnv>();
 
 snapshotRoutes.get("/", (c) => {
   const db = c.get("db");
   const user = c.get("user");
+  const { limit, offset } = readPageBounds(c);
   const rows = getDrizzle(db)
     .select()
     .from(monthly_snapshots)
     .where(eq(monthly_snapshots.user_id, user.id))
     .orderBy(desc(monthly_snapshots.snapshot_date), desc(monthly_snapshots.id))
+    .limit(limit)
+    .offset(offset)
     .all() as Parameters<typeof normalizeSnap>[0][];
   return jsonData(c, rows.map(normalizeSnap));
 });

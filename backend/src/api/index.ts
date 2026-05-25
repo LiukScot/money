@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { SQLiteDB } from "../db.ts";
 import type { ApiEnv } from "../schemas.ts";
+import { createRateLimiter } from "../rate-limit.ts";
 import { authRoutes } from "./auth.ts";
 import { backupRoutes, purgeRoutes } from "./backup.ts";
 import { movementRoutes } from "./movements.ts";
@@ -27,10 +28,22 @@ const PUBLIC_AUTH_PATHS = new Set([
 export function createApi(opts: CreateApiOptions) {
   const app = new Hono<AppEnv>();
 
+  // Per-instance rate limiter: defaults to 5 login attempts per IP per
+  // 15 min, configurable via LOGIN_RATE_LIMIT_MAX and
+  // LOGIN_RATE_LIMIT_WINDOW_SECONDS. argon2id verify is ~100 ms; without
+  // this cap an unauthenticated caller can pin a CPU core. Lives on the
+  // API instance so each createApi() call gets a fresh bucket.
+  // Set LOGIN_RATE_LIMIT_MAX=0 to disable (e.g. E2E test runs).
+  const loginRateLimiter = createRateLimiter(
+    opts.env.LOGIN_RATE_LIMIT_MAX,
+    opts.env.LOGIN_RATE_LIMIT_WINDOW_SECONDS * 1000
+  );
+
   app.use("*", securityHeaders);
   app.use("*", async (c, next) => {
     c.set("db", opts.db);
     c.set("env", opts.env);
+    c.set("loginRateLimiter", loginRateLimiter);
     await next();
   });
   app.use("*", originGuard(opts.env.ALLOWED_ORIGINS));

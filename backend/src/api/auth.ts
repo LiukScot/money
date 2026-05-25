@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 
 import { eq, sql } from "drizzle-orm";
@@ -24,13 +24,35 @@ type UserRow = {
   disabled_at: string | null;
 };
 
+/**
+ * Best-effort client IP for the rate-limit bucket key. Reads standard
+ * reverse-proxy headers; if neither is present we collapse all callers
+ * into a single "unknown" bucket. That is intentional: the cap still
+ * applies in aggregate, so header-stripping doesn't unlock unbounded
+ * argon2 verification.
+ */
+function clientIp(c: Context<AppEnv>): string {
+  const fwd = c.req.header("x-forwarded-for");
+  if (fwd) return (fwd.split(",")[0] ?? "").trim() || "unknown";
+  const real = c.req.header("x-real-ip");
+  if (real) return real.trim();
+  return "unknown";
+}
+
 export const authRoutes = new Hono<AppEnv>();
 
 authRoutes.post("/register", (c) =>
   jsonError(c, "SIGNUP_DISABLED", "Signup is disabled", 403)
 );
 
-authRoutes.post("/login", validateJson(loginSchema), async (c) => {
+authRoutes.post("/login", async (c, next) => {
+  const decision = c.get("loginRateLimiter").check(clientIp(c));
+  if (!decision.allowed) {
+    c.header("retry-after", String(decision.retryAfterSeconds));
+    return jsonError(c, "RATE_LIMITED", "Too many login attempts. Try again later.", 429);
+  }
+  return next();
+}, validateJson(loginSchema), async (c) => {
   const body = c.req.valid("json");
   const db = c.get("db");
   const env = c.get("env");

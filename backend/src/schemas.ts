@@ -79,4 +79,8 @@ export type ApiEnv = {
   ALLOWED_ORIGINS: string;
   PUBLIC_DIR: string;
   COOKIE_SECURE: string;
+  /** Max failed login attempts per IP per window. Disable rate limit with 0. */
+  LOGIN_RATE_LIMIT_MAX: number;
+  /** Sliding window length in seconds for the login rate limit. */
+  LOGIN_RATE_LIMIT_WINDOW_SECONDS: number;
 };

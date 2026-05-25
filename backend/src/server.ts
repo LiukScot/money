@@ -4,8 +4,8 @@ import { z } from "zod";
 import { lte } from "drizzle-orm";
 import { getDrizzle, openDb, runMigrations } from "./db.ts";
 import { user_sessions } from "./db/schema.ts";
-import { createApi } from "./app.ts";
-import { makeError, setSecurityHeaders } from "./helpers.ts";
+import { createApi } from "./api/index.ts";
+import { applySecurityHeaders } from "./security-headers.ts";
 
 const envSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
@@ -48,15 +48,18 @@ const server = Bun.serve({
   port: env.PORT,
   async fetch(req) {
     const url = new URL(req.url);
-    const cors = api.getCorsHeaders(req);
-    if (cors instanceof Response) return cors;
 
     if (url.pathname.startsWith("/api/")) {
       return api.fetch(req);
     }
 
     if (req.method !== "GET" && req.method !== "HEAD") {
-      return makeError("METHOD_NOT_ALLOWED", "Method not allowed", 405, undefined, cors);
+      const headers = new Headers({ "content-type": "application/json" });
+      applySecurityHeaders(headers);
+      return new Response(
+        JSON.stringify({ error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed" } }),
+        { status: 405, headers }
+      );
     }
 
     if (
@@ -67,25 +70,29 @@ const server = Bun.serve({
       url.pathname === "/mymoney" ||
       url.pathname.startsWith("/mymoney/")
     ) {
-      return makeError("NOT_FOUND", "Route not found", 404, undefined, cors);
+      const headers = new Headers({ "content-type": "application/json" });
+      applySecurityHeaders(headers);
+      return new Response(
+        JSON.stringify({ error: { code: "NOT_FOUND", message: "Route not found" } }),
+        { status: 404, headers }
+      );
     }
 
     const staticFile = resolveStaticFile(env.PUBLIC_DIR, url.pathname);
     if (staticFile) {
-      setSecurityHeaders(cors);
-      return new Response(Bun.file(staticFile), { headers: cors });
+      const headers = new Headers();
+      applySecurityHeaders(headers);
+      return new Response(Bun.file(staticFile), { headers });
     }
 
     const indexFile = path.resolve(env.PUBLIC_DIR, "index.html");
     if (fs.existsSync(indexFile)) {
-      setSecurityHeaders(cors);
-      return new Response(Bun.file(indexFile), { headers: cors });
+      const headers = new Headers();
+      applySecurityHeaders(headers);
+      return new Response(Bun.file(indexFile), { headers });
     }
 
-    return new Response("myMoney backend running. Frontend build not found.", {
-      status: 200,
-      headers: cors
-    });
+    return new Response("myMoney backend running. Frontend build not found.", { status: 200 });
   }
 });
 

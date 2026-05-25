@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiEnvelopeSchema, apiFetch, formatCurrency } from "./lib";
-import { mmSchema } from "./types";
+import { apiEnvelopeSchema, apiFetch } from "./lib";
 import { DashboardPanel } from "@/features/dashboard/DashboardPanel";
 import { SnapshotsPanel } from "@/features/snapshots/SnapshotsPanel";
 import { TransactionsPanel } from "@/features/transactions/TransactionsPanel";
+import { MovementsPanel } from "@/features/movements/MovementsPanel";
 import { useAuthStore } from "@/shared/auth/authStore";
 import { useSessionSync } from "@/shared/auth/useSessionSync";
 import { sessionSchema } from "@/shared/auth/sessionSchema";
@@ -18,16 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -42,13 +33,6 @@ const changePasswordSchema = z
   })
   .refine((v) => v.newPassword === v.confirmPassword, { path: ["confirmPassword"], message: "Passwords do not match" });
 
-const mmFormSchema = z.object({
-  name: z.string().min(1),
-  direction: z.enum(["income", "expense"]),
-  amount: z.coerce.number().nonnegative(),
-  note: z.string().default("")
-});
-
 const navItems = ["dashboard", "transactions", "movements", "snapshots", "settings"] as const;
 type NavItem = (typeof navItems)[number];
 
@@ -56,17 +40,10 @@ function App() {
   const queryClient = useQueryClient();
   const { user, setUser } = useAuthStore();
   const [nav, setNav] = useState<NavItem>("dashboard");
-  const [editingMmId, setEditingMmId] = useState<string | null>(null);
   const [styleJson, setStyleJson] = useState("{}");
   const [accountOpen, setAccountOpen] = useState(false);
 
   useSessionSync();
-
-  const mmQuery = useQuery({
-    queryKey: ["movements"],
-    enabled: !!user,
-    queryFn: async () => apiFetch("/api/v1/monthly-movements", { method: "GET" }, (raw) => apiEnvelopeSchema(z.array(mmSchema)).parse(raw).data)
-  });
 
   const stylesQuery = useQuery({
     queryKey: ["styles"],
@@ -92,14 +69,6 @@ function App() {
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({ resolver: zodResolver(loginSchema) });
   const changePasswordForm = useForm<z.infer<typeof changePasswordSchema>>({ resolver: zodResolver(changePasswordSchema) });
-  const mmForm = useForm<z.infer<typeof mmFormSchema>>({
-    defaultValues: {
-      name: "",
-      direction: "income",
-      amount: "" as unknown as number,
-      note: ""
-    }
-  });
   const loginMutation = useMutation({
     mutationFn: async (values: z.infer<typeof loginSchema>) =>
       apiFetch(
@@ -140,41 +109,6 @@ function App() {
     }
   });
 
-  const mmMutation = useMutation({
-    mutationFn: async (values: z.infer<typeof mmFormSchema>) => {
-      const payload = mmFormSchema.parse(values);
-      if (editingMmId) {
-        return apiFetch(
-          `/api/v1/monthly-movements/${editingMmId}`,
-          { method: "PUT", body: JSON.stringify(payload) },
-          (raw) => apiEnvelopeSchema(z.object({ ok: z.boolean() })).parse(raw).data
-        );
-      }
-      return apiFetch(
-        "/api/v1/monthly-movements",
-        { method: "POST", body: JSON.stringify(payload) },
-        (raw) => apiEnvelopeSchema(z.object({ id: z.string() })).parse(raw).data
-      );
-    },
-    onSuccess: async () => {
-      setEditingMmId(null);
-      mmForm.reset({ name: "", direction: "income", amount: "" as unknown as number, note: "" });
-      await queryClient.invalidateQueries({ queryKey: ["movements"] });
-    }
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async ({ path }: { path: string }) => apiFetch(path, { method: "DELETE" }, (raw) => apiEnvelopeSchema(z.object({ ok: z.boolean() })).parse(raw).data),
-    onSuccess: async (_data, { path }) => {
-      if (path.startsWith("/api/v1/transactions/")) {
-        await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      } else if (path.startsWith("/api/v1/monthly-movements/")) {
-        await queryClient.invalidateQueries({ queryKey: ["movements"] });
-      } else if (path.startsWith("/api/v1/monthly-snapshots/")) {
-        await queryClient.invalidateQueries({ queryKey: ["snapshots"] });
-      }
-    }
-  });
 
   const prefsMutation = useMutation({
     mutationFn: async (showZeroAssets: boolean) =>
@@ -337,101 +271,7 @@ function App() {
 
       {nav === "transactions" && <TransactionsPanel />}
 
-      {nav === "movements" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly movements</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-6">
-            <form className="grid gap-4" onSubmit={mmForm.handleSubmit((v) => mmMutation.mutate(v))}>
-              <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
-                <Field id="mm-name" label="Name">
-                  <Input id="mm-name" type="text" {...mmForm.register("name")} />
-                </Field>
-                <Field id="mm-direction" label="Direction">
-                  <Controller
-                    control={mmForm.control}
-                    name="direction"
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={(v) => field.onChange(v as "income" | "expense")}>
-                        <SelectTrigger id="mm-direction">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="income">income</SelectItem>
-                          <SelectItem value="expense">expense</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </Field>
-                <Field id="mm-amount" label="Amount">
-                  <Input id="mm-amount" type="number" step="0.01" placeholder="0" {...mmForm.register("amount")} />
-                </Field>
-                <Field id="mm-note" label="Note">
-                  <Textarea id="mm-note" {...mmForm.register("note")} />
-                </Field>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <Button type="submit">{editingMmId ? "Update" : "Add"}</Button>
-                {editingMmId && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setEditingMmId(null);
-                      mmForm.reset({ name: "", direction: "income", amount: "" as unknown as number, note: "" });
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                )}
-              </div>
-            </form>
-
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Direction</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(mmQuery.data ?? []).map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{row.name}</TableCell>
-                    <TableCell>{row.direction}</TableCell>
-                    <TableCell>{formatCurrency(row.amount)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingMmId(row.id);
-                            mmForm.reset({ name: row.name, direction: row.direction, amount: row.amount, note: row.note });
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteMutation.mutate({ path: `/api/v1/monthly-movements/${row.id}` })}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+      {nav === "movements" && <MovementsPanel />}
 
       {nav === "snapshots" && <SnapshotsPanel />}
 

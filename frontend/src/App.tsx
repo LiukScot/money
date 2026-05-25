@@ -2,22 +2,20 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiEnvelopeSchema, apiFetch } from "./lib";
 import { DashboardPanel } from "@/features/dashboard/DashboardPanel";
 import { SnapshotsPanel } from "@/features/snapshots/SnapshotsPanel";
 import { TransactionsPanel } from "@/features/transactions/TransactionsPanel";
 import { MovementsPanel } from "@/features/movements/MovementsPanel";
+import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { useAuthStore } from "@/shared/auth/authStore";
 import { useSessionSync } from "@/shared/auth/useSessionSync";
 import { sessionSchema } from "@/shared/auth/sessionSchema";
 import { Field } from "@/shared/ui/Field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const loginSchema = z.object({
@@ -40,35 +38,13 @@ function App() {
   const queryClient = useQueryClient();
   const { user, setUser } = useAuthStore();
   const [nav, setNav] = useState<NavItem>("dashboard");
-  const [styleJson, setStyleJson] = useState("{}");
   const [accountOpen, setAccountOpen] = useState(false);
 
   useSessionSync();
 
-  const stylesQuery = useQuery({
-    queryKey: ["styles"],
-    enabled: !!user,
-    queryFn: async () =>
-      apiFetch(
-        "/api/v1/assets/styles",
-        { method: "GET" },
-        (raw) => apiEnvelopeSchema(z.record(z.string(), z.object({ colorHex: z.string().nullable(), riskLevel: z.string().nullable() }))).parse(raw).data
-      )
-  });
-
-  const prefsQuery = useQuery({
-    queryKey: ["prefs"],
-    enabled: !!user,
-    queryFn: async () =>
-      apiFetch(
-        "/api/v1/preferences",
-        { method: "GET" },
-        (raw) => apiEnvelopeSchema(z.object({ showZeroAssets: z.boolean(), updatedAt: z.string().nullable().optional() })).parse(raw).data
-      )
-  });
-
   const loginForm = useForm<z.infer<typeof loginSchema>>({ resolver: zodResolver(loginSchema) });
   const changePasswordForm = useForm<z.infer<typeof changePasswordSchema>>({ resolver: zodResolver(changePasswordSchema) });
+
   const loginMutation = useMutation({
     mutationFn: async (values: z.infer<typeof loginSchema>) =>
       apiFetch(
@@ -108,74 +84,6 @@ function App() {
       alert("Password updated");
     }
   });
-
-
-  const prefsMutation = useMutation({
-    mutationFn: async (showZeroAssets: boolean) =>
-      apiFetch(
-        "/api/v1/preferences",
-        { method: "PUT", body: JSON.stringify({ showZeroAssets }) },
-        (raw) => apiEnvelopeSchema(z.object({ ok: z.boolean() })).parse(raw).data
-      ),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["prefs"] });
-    }
-  });
-
-  const stylesMutation = useMutation({
-    mutationFn: async (styles: Record<string, { colorHex: string | null; riskLevel: string | null }>) =>
-      apiFetch(
-        "/api/v1/assets/styles",
-        { method: "PUT", body: JSON.stringify({ styles }) },
-        (raw) => apiEnvelopeSchema(z.object({ ok: z.boolean() })).parse(raw).data
-      ),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["styles"] });
-    }
-  });
-
-  const purgeMutation = useMutation({
-    mutationFn: async () => apiFetch("/api/v1/data/purge", { method: "POST" }, (raw) => apiEnvelopeSchema(z.object({ ok: z.boolean() })).parse(raw).data),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries();
-      setNav("dashboard");
-    }
-  });
-
-  const doExportJson = async () => {
-    const payload = await apiFetch("/api/v1/backup/json", { method: "GET" }, (raw) => apiEnvelopeSchema(z.any()).parse(raw).data);
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `money-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-
-  const doImportJson = async (file: File) => {
-    const parsed = JSON.parse(await file.text());
-    await apiFetch("/api/v1/backup/json/import", { method: "POST", body: JSON.stringify(parsed) }, (raw) => apiEnvelopeSchema(z.object({ ok: z.boolean() })).parse(raw).data);
-    await queryClient.invalidateQueries();
-  };
-
-  const doExportXlsx = async () => {
-    const res = await fetch("/api/v1/backup/xlsx", { credentials: "include" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `money-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-
-  const doImportXlsx = async (file: File) => {
-    const form = new FormData();
-    form.set("file", file);
-    const res = await fetch("/api/v1/backup/xlsx/import", { method: "POST", credentials: "include", body: form });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    await queryClient.invalidateQueries();
-  };
 
   if (!user) {
     return (
@@ -268,111 +176,10 @@ function App() {
       </nav>
 
       {nav === "dashboard" && <DashboardPanel />}
-
       {nav === "transactions" && <TransactionsPanel />}
-
       {nav === "movements" && <MovementsPanel />}
-
       {nav === "snapshots" && <SnapshotsPanel />}
-
-      {nav === "settings" && (
-        <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Preferences</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={Boolean(prefsQuery.data?.showZeroAssets)}
-                  onCheckedChange={(checked) => prefsMutation.mutate(checked === true)}
-                />
-                Show zero-value assets
-              </Label>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Asset styles (JSON)</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              <Button variant="outline" size="sm" onClick={() => setStyleJson(JSON.stringify(stylesQuery.data ?? {}, null, 2))}>
-                Load current
-              </Button>
-              <Textarea rows={10} value={styleJson} onChange={(e) => setStyleJson(e.target.value)} />
-              <Button
-                size="sm"
-                onClick={() => {
-                  try {
-                    const parsed = JSON.parse(styleJson);
-                    stylesMutation.mutate(parsed);
-                  } catch {
-                    alert("Invalid JSON");
-                  }
-                }}
-              >
-                Save styles
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Backup</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              <Button variant="outline" size="sm" onClick={() => doExportJson().catch((err) => alert((err as Error).message))}>
-                Export JSON
-              </Button>
-              <Label className="grid gap-1.5 rounded-md border border-dashed border-border p-3 cursor-pointer text-sm">
-                Import JSON
-                <Input
-                  type="file"
-                  accept=".json"
-                  className="border-0 p-0 h-auto file:mr-2"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) doImportJson(file).catch((err) => alert((err as Error).message));
-                  }}
-                />
-              </Label>
-              <Button variant="outline" size="sm" onClick={() => doExportXlsx().catch((err) => alert((err as Error).message))}>
-                Export XLSX
-              </Button>
-              <Label className="grid gap-1.5 rounded-md border border-dashed border-border p-3 cursor-pointer text-sm">
-                Import XLSX
-                <Input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="border-0 p-0 h-auto file:mr-2"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) doImportXlsx(file).catch((err) => alert((err as Error).message));
-                  }}
-                />
-              </Label>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base text-destructive">Danger zone</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => {
-                  if (confirm("Delete all money data for this account?")) purgeMutation.mutate();
-                }}
-              >
-                Purge all data
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {nav === "settings" && <SettingsPanel onPurged={() => setNav("dashboard")} />}
     </main>
   );
 }

@@ -4,10 +4,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEnvelopeSchema, apiFetch, formatCurrency } from "./lib";
-import { mmSchema, snapSchema, txSchema } from "./types";
+import { mmSchema, txSchema } from "./types";
 import { DashboardPanel } from "@/features/dashboard/DashboardPanel";
-import { MonthlyRiskChart } from "./components/snapshots/MonthlyRiskChart";
-import { computePerAsset } from "./lib/dashboard";
+import { SnapshotsPanel } from "@/features/snapshots/SnapshotsPanel";
 import { useAuthStore } from "@/shared/auth/authStore";
 import { useSessionSync } from "@/shared/auth/useSessionSync";
 import { sessionSchema } from "@/shared/auth/sessionSchema";
@@ -70,11 +69,6 @@ const mmFormSchema = z.object({
   note: z.string().default("")
 });
 
-const snapFormSchema = z.object({
-  snapshotDate: z.string().min(1),
-  liquid: z.coerce.number()
-});
-
 const navItems = ["dashboard", "transactions", "movements", "snapshots", "settings"] as const;
 type NavItem = (typeof navItems)[number];
 
@@ -99,12 +93,6 @@ function App() {
     queryKey: ["movements"],
     enabled: !!user,
     queryFn: async () => apiFetch("/api/v1/monthly-movements", { method: "GET" }, (raw) => apiEnvelopeSchema(z.array(mmSchema)).parse(raw).data)
-  });
-
-  const snapQuery = useQuery({
-    queryKey: ["snapshots"],
-    enabled: !!user,
-    queryFn: async () => apiFetch("/api/v1/monthly-snapshots", { method: "GET" }, (raw) => apiEnvelopeSchema(z.array(snapSchema)).parse(raw).data)
   });
 
   const stylesQuery = useQuery({
@@ -204,13 +192,6 @@ function App() {
       note: ""
     }
   });
-  const snapForm = useForm<z.infer<typeof snapFormSchema>>({
-    defaultValues: {
-      snapshotDate: new Date().toISOString().slice(0, 10),
-      liquid: "" as unknown as number
-    }
-  });
-
   const loginMutation = useMutation({
     mutationFn: async (values: z.infer<typeof loginSchema>) =>
       apiFetch(
@@ -305,39 +286,6 @@ function App() {
       setEditingMmId(null);
       mmForm.reset({ name: "", direction: "income", amount: "" as unknown as number, note: "" });
       await queryClient.invalidateQueries({ queryKey: ["movements"] });
-    }
-  });
-
-  const snapMutation = useMutation({
-    mutationFn: async (values: z.infer<typeof snapFormSchema>) => {
-      const form = snapFormSchema.parse(values);
-      if (!txQuery.isSuccess || !stylesQuery.isSuccess) {
-        throw new Error("Attendi il caricamento di transazioni e stili asset prima di creare uno snapshot.");
-      }
-      const stats = computePerAsset(txQuery.data, stylesQuery.data);
-      const totals = { low: 0, medium: 0, high: 0 };
-      for (const s of stats) {
-        if (s.riskLevel === "low") totals.low += s.current;
-        else if (s.riskLevel === "medium") totals.medium += s.current;
-        else if (s.riskLevel === "high") totals.high += s.current;
-      }
-      const round2 = (n: number) => Math.round(n * 100) / 100;
-      const payload = {
-        snapshotDate: form.snapshotDate,
-        lowRisk: round2(totals.low),
-        mediumRisk: round2(totals.medium),
-        highRisk: round2(totals.high),
-        liquid: form.liquid
-      };
-      return apiFetch(
-        "/api/v1/monthly-snapshots",
-        { method: "POST", body: JSON.stringify(payload) },
-        (raw) => apiEnvelopeSchema(z.object({ id: z.string() })).parse(raw).data
-      );
-    },
-    onSuccess: async () => {
-      snapForm.reset({ snapshotDate: new Date().toISOString().slice(0, 10), liquid: "" as unknown as number });
-      await queryClient.invalidateQueries({ queryKey: ["snapshots"] });
     }
   });
 
@@ -770,62 +718,7 @@ function App() {
         </Card>
       )}
 
-      {nav === "snapshots" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly snapshots</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-6">
-            <MonthlyRiskChart snapshots={snapQuery.data ?? []} />
-            <form className="grid gap-4" onSubmit={snapForm.handleSubmit((v) => snapMutation.mutate(v))}>
-              <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
-                <Field id="snap-date" label="Date">
-                  <Input id="snap-date" type="date" {...snapForm.register("snapshotDate")} />
-                </Field>
-                <Field id="snap-liquid" label="Liquid">
-                  <Input id="snap-liquid" type="number" step="0.01" placeholder="0" {...snapForm.register("liquid")} />
-                </Field>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <Button type="submit" disabled={!txQuery.isSuccess || !stylesQuery.isSuccess}>Add</Button>
-              </div>
-            </form>
-
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Low</TableHead>
-                  <TableHead>Medium</TableHead>
-                  <TableHead>High</TableHead>
-                  <TableHead>Liquid</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(snapQuery.data ?? []).map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{row.snapshotDate}</TableCell>
-                    <TableCell>{formatCurrency(row.lowRisk)}</TableCell>
-                    <TableCell>{formatCurrency(row.mediumRisk)}</TableCell>
-                    <TableCell>{formatCurrency(row.highRisk)}</TableCell>
-                    <TableCell>{formatCurrency(row.liquid)}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteMutation.mutate({ path: `/api/v1/monthly-snapshots/${row.id}` })}
-                      >
-                        Delete
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+      {nav === "snapshots" && <SnapshotsPanel />}
 
       {nav === "settings" && (
         <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">

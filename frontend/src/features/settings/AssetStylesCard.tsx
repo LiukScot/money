@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +37,7 @@ export function AssetStylesCard() {
               const parsed = stylesInputSchema.parse(JSON.parse(styleJson));
               stylesMutation.mutate(parsed);
             } catch {
-              alert("Invalid JSON");
+              toast.error("Invalid JSON");
             }
           }}
         >

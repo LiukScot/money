@@ -3,12 +3,15 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { create } from "zustand";
 import { apiEnvelopeSchema, apiFetch, formatCurrency } from "./lib";
 import { mmSchema, snapSchema, txSchema } from "./types";
 import { DashboardPanel } from "./components/dashboard/DashboardPanel";
 import { MonthlyRiskChart } from "./components/snapshots/MonthlyRiskChart";
 import { computePerAsset } from "./lib/dashboard";
+import { useAuthStore } from "@/shared/auth/authStore";
+import { useSessionSync } from "@/shared/auth/useSessionSync";
+import { sessionSchema } from "@/shared/auth/sessionSchema";
+import { Field } from "@/shared/ui/Field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,17 +40,6 @@ function tipoShowsPnl(tipo: string): boolean {
   if (TIPO_BUY_ONLY.has(tipo)) return false;
   return true;
 }
-
-type User = { id: number; email: string; name: string | null };
-type AuthState = { user: User | null; setUser: (user: User | null) => void };
-const useAuthStore = create<AuthState>((set) => ({ user: null, setUser: (user) => set({ user }) }));
-
-const sessionSchema = apiEnvelopeSchema(
-  z.object({
-    authenticated: z.boolean(),
-    user: z.object({ id: z.number(), email: z.string(), name: z.string().nullable() }).optional()
-  })
-);
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -86,15 +78,6 @@ const snapFormSchema = z.object({
 const navItems = ["dashboard", "transactions", "movements", "snapshots", "settings"] as const;
 type NavItem = (typeof navItems)[number];
 
-function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-    </div>
-  );
-}
-
 function App() {
   const queryClient = useQueryClient();
   const { user, setUser } = useAuthStore();
@@ -104,19 +87,7 @@ function App() {
   const [styleJson, setStyleJson] = useState("{}");
   const [accountOpen, setAccountOpen] = useState(false);
 
-  const sessionQuery = useQuery({
-    queryKey: ["session"],
-    queryFn: async () => apiFetch("/api/v1/auth/session", { method: "GET" }, (raw) => sessionSchema.parse(raw).data)
-  });
-
-  useEffect(() => {
-    if (sessionQuery.data?.authenticated && sessionQuery.data.user && !user) {
-      setUser(sessionQuery.data.user);
-    }
-    if (sessionQuery.data && !sessionQuery.data.authenticated && user) {
-      setUser(null);
-    }
-  }, [sessionQuery.data, user, setUser]);
+  useSessionSync();
 
   const txQuery = useQuery({
     queryKey: ["transactions"],

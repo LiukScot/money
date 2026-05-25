@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -39,14 +39,28 @@ export function AssetCombobox({
 
   const visible = filtered.slice(0, MAX_VISIBLE);
 
-  useEffect(() => {
+  // Highlight reset lives inside each handler that mutates value or open
+  // (avoids react-hooks/set-state-in-effect). The trade-off: a caller that
+  // programmatically swaps `value` won't reset focusedIdx — but `value` is
+  // bounded to [-1, visible.length - 1] anyway and ArrowUp/Down wrap around.
+  const handleChange = (next: string) => {
     setFocusedIdx(-1);
-  }, [value, open]);
+    onChange(next);
+  };
+
+  const openPopover = () => {
+    setOpen(true);
+    setFocusedIdx(-1);
+  };
+
+  const closePopover = () => {
+    setOpen(false);
+    setFocusedIdx(-1);
+  };
 
   const select = (a: string) => {
     onChange(a);
-    setOpen(false);
-    setFocusedIdx(-1);
+    closePopover();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -69,7 +83,7 @@ export function AssetCombobox({
       }
     } else if (e.key === "Escape" && open) {
       e.preventDefault();
-      setOpen(false);
+      closePopover();
     }
   };
 
@@ -88,9 +102,9 @@ export function AssetCombobox({
         aria-controls={listId}
         aria-activedescendant={open && focusedIdx >= 0 ? `${id}-opt-${focusedIdx}` : undefined}
         value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onChange={(e) => handleChange(e.target.value)}
+        onFocus={openPopover}
+        onBlur={() => window.setTimeout(closePopover, 120)}
         onKeyDown={handleKeyDown}
       />
       {open && visible.length > 0 && (

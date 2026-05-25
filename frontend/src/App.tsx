@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEnvelopeSchema, apiFetch, formatCurrency } from "./lib";
 import { mmSchema, snapSchema, txSchema } from "./types";
-import { DashboardPanel } from "./components/dashboard/DashboardPanel";
+import { DashboardPanel } from "@/features/dashboard/DashboardPanel";
 import { MonthlyRiskChart } from "./components/snapshots/MonthlyRiskChart";
 import { computePerAsset } from "./lib/dashboard";
 import { useAuthStore } from "@/shared/auth/authStore";

@@ -1,5 +1,6 @@
 import type { SQLiteDB } from "../db.ts";
 import type { ApiEnv } from "../schemas.ts";
+import type { RateLimiter } from "../rate-limit.ts";
 
 export type SessionData = {
   sid: string;
@@ -20,5 +21,6 @@ export type AppEnv = {
     env: ApiEnv;
     session: SessionData;
     user: AuthedUser;
+    loginRateLimiter: RateLimiter;
   };
 };

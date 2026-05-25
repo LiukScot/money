@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { backupImportSchema } from "../schemas.ts";
 import { applyImport, buildBackupPayload, wipeUserData } from "./backup-helpers.ts";
 import type { AppEnv } from "./types.ts";
@@ -39,27 +39,72 @@ backupRoutes.post("/json/import", validateJson(backupImportSchema), (c) => {
   return jsonData(c, { ok: true });
 });
 
-backupRoutes.get("/xlsx", (c) => {
+/**
+ * Append an array of plain objects as a worksheet. First row = header keys,
+ * remaining rows = values in header order. Mirrors the shape produced by
+ * xlsx's deprecated `json_to_sheet` so import side stays compatible.
+ */
+function addObjectsSheet(
+  wb: ExcelJS.Workbook,
+  name: string,
+  rows: Record<string, unknown>[]
+): void {
+  const ws = wb.addWorksheet(name);
+  if (rows.length === 0) return;
+  const headers = Array.from(
+    new Set(rows.flatMap((r) => Object.keys(r)))
+  );
+  ws.columns = headers.map((h) => ({ header: h, key: h }));
+  for (const row of rows) ws.addRow(row);
+}
+
+/**
+ * Inverse of `addObjectsSheet`. Reads row 1 as headers, returns each
+ * subsequent row as an object keyed by header. Skips fully-empty rows.
+ */
+function sheetToObjects(ws: ExcelJS.Worksheet | undefined): Record<string, unknown>[] {
+  if (!ws) return [];
+  const headerRow = ws.getRow(1);
+  const headers: string[] = [];
+  headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+    headers[colNumber - 1] = String(cell.value ?? "");
+  });
+  if (headers.length === 0) return [];
+  const out: Record<string, unknown>[] = [];
+  for (let r = 2; r <= ws.rowCount; r += 1) {
+    const row = ws.getRow(r);
+    const obj: Record<string, unknown> = {};
+    let hasValue = false;
+    for (let c = 0; c < headers.length; c += 1) {
+      const header = headers[c];
+      if (!header) continue;
+      const raw = row.getCell(c + 1).value;
+      if (raw == null || raw === "") continue;
+      // ExcelJS returns Date objects for date-typed cells, numbers for
+      // numeric cells, strings otherwise. Coerce dates to YYYY-MM-DD so
+      // the downstream importer (which expects ISO date strings) stays
+      // happy. NOTE: this drops the time component — currently all date
+      // columns in the schema (tx_date, snapshot_date) are date-only.
+      // If a future column needs a timestamp, branch on the column name
+      // or use full toISOString().
+      obj[header] = raw instanceof Date ? raw.toISOString().slice(0, 10) : raw;
+      hasValue = true;
+    }
+    if (hasValue) out.push(obj);
+  }
+  return out;
+}
+
+backupRoutes.get("/xlsx", async (c) => {
   const db = c.get("db");
   const user = c.get("user");
   const payload = buildBackupPayload(db, user.id);
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(
-    wb,
-    XLSX.utils.json_to_sheet(payload.transactions ?? []),
-    "rawTransactions"
-  );
-  XLSX.utils.book_append_sheet(
-    wb,
-    XLSX.utils.json_to_sheet(payload.monthlyMovements ?? []),
-    "movements"
-  );
-  XLSX.utils.book_append_sheet(
-    wb,
-    XLSX.utils.json_to_sheet(payload.monthlySnapshots ?? []),
-    "monthlySnapshots"
-  );
+  const wb = new ExcelJS.Workbook();
+  addObjectsSheet(wb, "rawTransactions", payload.transactions ?? []);
+  addObjectsSheet(wb, "movements", payload.monthlyMovements ?? []);
+  addObjectsSheet(wb, "monthlySnapshots", payload.monthlySnapshots ?? []);
+
   const styleAssets = new Set<string>([
     ...Object.keys(payload.assetColors ?? {}),
     ...Object.keys(payload.assetRisks ?? {})
@@ -69,16 +114,12 @@ backupRoutes.get("/xlsx", (c) => {
     colorHex: payload.assetColors?.[asset] ?? "",
     riskLevel: payload.assetRisks?.[asset] ?? ""
   }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(styleRows), "assetStyles");
-  XLSX.utils.book_append_sheet(
-    wb,
-    XLSX.utils.json_to_sheet([
-      { showZeroAssets: Boolean(payload.preferences?.showZeroAssets ?? false) }
-    ]),
-    "preferences"
-  );
+  addObjectsSheet(wb, "assetStyles", styleRows);
+  addObjectsSheet(wb, "preferences", [
+    { showZeroAssets: Boolean(payload.preferences?.showZeroAssets ?? false) }
+  ]);
 
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const buf = Buffer.from(await wb.xlsx.writeBuffer());
   c.header(
     "content-type",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -94,7 +135,7 @@ backupRoutes.post("/xlsx/import", async (c) => {
   const db = c.get("db");
   const user = c.get("user");
   const contentType = c.req.header("content-type") ?? "";
-  let workbook: XLSX.WorkBook | null = null;
+  const wb = new ExcelJS.Workbook();
 
   if (contentType.includes("multipart/form-data")) {
     const form = await c.req.formData();
@@ -107,7 +148,7 @@ backupRoutes.post("/xlsx/import", async (c) => {
     }
     const arr = await file.arrayBuffer();
     try {
-      workbook = XLSX.read(Buffer.from(arr), { type: "buffer" });
+      await wb.xlsx.load(arr);
     } catch {
       return jsonError(c, "INVALID_FILE", "Could not parse file as XLSX", 400);
     }
@@ -126,33 +167,23 @@ backupRoutes.post("/xlsx/import", async (c) => {
       return jsonError(c, "FILE_TOO_LARGE", "File exceeds 10 MB limit", 400);
     }
     try {
-      workbook = XLSX.read(rawBytes, { type: "buffer" });
+      await wb.xlsx.load(rawBytes.buffer.slice(rawBytes.byteOffset, rawBytes.byteOffset + rawBytes.byteLength));
     } catch {
       return jsonError(c, "INVALID_FILE", "Could not parse file as XLSX", 400);
     }
   }
 
-  const txSheet = workbook.Sheets["rawTransactions"];
-  const mmSheet = workbook.Sheets["movements"];
-  const snapSheet = workbook.Sheets["monthlySnapshots"];
-  const styleSheet = workbook.Sheets["assetStyles"];
-  const prefSheet = workbook.Sheets["preferences"];
+  const txSheet = wb.getWorksheet("rawTransactions");
+  const mmSheet = wb.getWorksheet("movements");
+  const snapSheet = wb.getWorksheet("monthlySnapshots");
+  const styleSheet = wb.getWorksheet("assetStyles");
+  const prefSheet = wb.getWorksheet("preferences");
 
-  const transactions = txSheet
-    ? (XLSX.utils.sheet_to_json(txSheet) as Record<string, unknown>[])
-    : [];
-  const monthlyMovements = mmSheet
-    ? (XLSX.utils.sheet_to_json(mmSheet) as Record<string, unknown>[])
-    : [];
-  const monthlySnapshots = snapSheet
-    ? (XLSX.utils.sheet_to_json(snapSheet) as Record<string, unknown>[])
-    : [];
-  const styleRows = styleSheet
-    ? (XLSX.utils.sheet_to_json(styleSheet) as Record<string, unknown>[])
-    : [];
-  const prefRows = prefSheet
-    ? (XLSX.utils.sheet_to_json(prefSheet) as Record<string, unknown>[])
-    : [];
+  const transactions = sheetToObjects(txSheet);
+  const monthlyMovements = sheetToObjects(mmSheet);
+  const monthlySnapshots = sheetToObjects(snapSheet);
+  const styleRows = sheetToObjects(styleSheet);
+  const prefRows = sheetToObjects(prefSheet);
 
   const hasStyleSheet = Boolean(styleSheet);
   const hasPrefSheet = Boolean(prefSheet);

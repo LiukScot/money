@@ -7,17 +7,21 @@ import { movementSchema } from "../schemas.ts";
 import { makeId, normalizeMm } from "../helpers.ts";
 import type { AppEnv } from "./types.ts";
 import { jsonData, jsonError, validateJson } from "./responses.ts";
+import { readPageBounds } from "./pagination.ts";
 
 export const movementRoutes = new Hono<AppEnv>();
 
 movementRoutes.get("/", (c) => {
   const db = c.get("db");
   const user = c.get("user");
+  const { limit, offset } = readPageBounds(c);
   const rows = getDrizzle(db)
     .select()
     .from(monthly_movements)
     .where(eq(monthly_movements.user_id, user.id))
     .orderBy(monthly_movements.name, desc(monthly_movements.id))
+    .limit(limit)
+    .offset(offset)
     .all() as Parameters<typeof normalizeMm>[0][];
   return jsonData(c, rows.map(normalizeMm));
 });

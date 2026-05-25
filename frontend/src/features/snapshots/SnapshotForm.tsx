@@ -13,7 +13,7 @@ type Props = {
 export function SnapshotForm({ form, disabled, onSubmit }: Props) {
   return (
     <form className="grid gap-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         <Field id="snap-date" label="Date">
           <Input id="snap-date" type="date" {...form.register("snapshotDate")} />
         </Field>

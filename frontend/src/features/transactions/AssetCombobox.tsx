@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -13,6 +13,7 @@ type Props = {
 };
 
 const MAX_VISIBLE = 8;
+const BLUR_CLOSE_DELAY_MS = 120;
 
 /**
  * Accessible asset autocomplete. Owns its own open/focus state but is
@@ -30,6 +31,18 @@ export function AssetCombobox({
 }: Props) {
   const [open, setOpen] = useState(false);
   const [focusedIdx, setFocusedIdx] = useState(-1);
+  // Track the pending blur-close timeout so we can clear it on unmount or
+  // when the component refocuses (AGENTS.md §13: every setTimeout needs a
+  // cleanup path).
+  const blurTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current !== null) {
+        window.clearTimeout(blurTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const q = (value ?? "").toLowerCase().trim();
@@ -49,6 +62,10 @@ export function AssetCombobox({
   };
 
   const openPopover = () => {
+    if (blurTimeoutRef.current !== null) {
+      window.clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
     setOpen(true);
     setFocusedIdx(-1);
   };
@@ -56,6 +73,16 @@ export function AssetCombobox({
   const closePopover = () => {
     setOpen(false);
     setFocusedIdx(-1);
+  };
+
+  const scheduleBlurClose = () => {
+    if (blurTimeoutRef.current !== null) {
+      window.clearTimeout(blurTimeoutRef.current);
+    }
+    blurTimeoutRef.current = window.setTimeout(() => {
+      blurTimeoutRef.current = null;
+      closePopover();
+    }, BLUR_CLOSE_DELAY_MS);
   };
 
   const select = (a: string) => {
@@ -94,6 +121,7 @@ export function AssetCombobox({
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
+        name={id}
         type="text"
         autoComplete="off"
         placeholder={options.length > 0 ? populatedPlaceholder : emptyPlaceholder}
@@ -104,7 +132,7 @@ export function AssetCombobox({
         value={value ?? ""}
         onChange={(e) => handleChange(e.target.value)}
         onFocus={openPopover}
-        onBlur={() => window.setTimeout(closePopover, 120)}
+        onBlur={scheduleBlurClose}
         onKeyDown={handleKeyDown}
       />
       {open && visible.length > 0 && (

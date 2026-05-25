@@ -18,7 +18,9 @@ export function DangerZoneCard({ onPurged }: Props) {
         <Button
           variant="destructive"
           size="sm"
+          disabled={purgeMutation.isPending}
           onClick={() => {
+            if (purgeMutation.isPending) return;
             if (confirm("Delete all money data for this account?")) purgeMutation.mutate();
           }}
         >

@@ -17,8 +17,13 @@ function App() {
   const user = useAuthStore((s) => s.user);
   const [nav, setNav] = useState<NavItem>("dashboard");
 
-  useSessionSync();
+  const sessionQuery = useSessionSync();
 
+  // Wait for the first session response so authenticated users don't flash
+  // the LoginScreen for one paint while the cookie-based session resolves.
+  if (sessionQuery.isLoading) {
+    return <main className="min-h-screen grid place-items-center p-6 text-sm text-muted-foreground" />;
+  }
   if (!user) return <LoginScreen />;
 
   return (

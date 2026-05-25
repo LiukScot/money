@@ -18,9 +18,14 @@ export function BackupCard() {
         <Button variant="outline" size="sm" onClick={() => exportJson().catch(reportError)}>
           Export JSON
         </Button>
-        <Label className="grid gap-1.5 rounded-md border border-dashed border-border p-3 cursor-pointer text-sm">
+        <Label
+          htmlFor="import-json-file"
+          className="grid gap-1.5 rounded-md border border-dashed border-border p-3 cursor-pointer text-sm"
+        >
           Import JSON
           <Input
+            id="import-json-file"
+            name="importJsonFile"
             type="file"
             accept=".json"
             className="border-0 p-0 h-auto file:mr-2"
@@ -33,9 +38,14 @@ export function BackupCard() {
         <Button variant="outline" size="sm" onClick={() => exportXlsx().catch(reportError)}>
           Export XLSX
         </Button>
-        <Label className="grid gap-1.5 rounded-md border border-dashed border-border p-3 cursor-pointer text-sm">
+        <Label
+          htmlFor="import-xlsx-file"
+          className="grid gap-1.5 rounded-md border border-dashed border-border p-3 cursor-pointer text-sm"
+        >
           Import XLSX
           <Input
+            id="import-xlsx-file"
+            name="importXlsxFile"
             type="file"
             accept=".xlsx,.xls"
             className="border-0 p-0 h-auto file:mr-2"

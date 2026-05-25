@@ -22,18 +22,19 @@ type Props = {
   form: UseFormReturn<TxFormValues>;
   assetOptions: string[];
   editingId: string | null;
+  isSubmitting: boolean;
   onSubmit: (values: TxFormValues) => void;
   onCancel: () => void;
 };
 
-export function TransactionForm({ form, assetOptions, editingId, onSubmit, onCancel }: Props) {
+export function TransactionForm({ form, assetOptions, editingId, isSubmitting, onSubmit, onCancel }: Props) {
   const watchedTipo = form.watch("tipo");
   const showBuyValue = tipoShowsBuyValue(watchedTipo);
   const showPnl = tipoShowsPnl(watchedTipo);
 
   return (
     <form className="grid gap-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         <Field id="tx-date" label="Date">
           <Input id="tx-date" type="date" {...form.register("txDate")} />
         </Field>
@@ -83,7 +84,7 @@ export function TransactionForm({ form, assetOptions, editingId, onSubmit, onCan
         </Field>
       </div>
       <div className="flex gap-2 flex-wrap">
-        <Button type="submit">{editingId ? "Update" : "Add"}</Button>
+        <Button type="submit" disabled={isSubmitting}>{editingId ? "Update" : "Add"}</Button>
         {editingId && (
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel

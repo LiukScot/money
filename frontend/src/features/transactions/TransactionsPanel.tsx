@@ -38,7 +38,11 @@ export function TransactionsPanel() {
           form={form}
           assetOptions={assetOptions}
           editingId={editingId}
-          onSubmit={(values) => txMutation.mutate(values)}
+          isSubmitting={txMutation.isPending}
+          onSubmit={(values) => {
+            if (txMutation.isPending) return;
+            txMutation.mutate(values);
+          }}
           onCancel={() => {
             setEditingId(null);
             form.reset(txFormDefaults);
@@ -57,7 +61,10 @@ export function TransactionsPanel() {
               note: row.note
             });
           }}
-          onDelete={(id) => deleteMutation.mutate(id)}
+          onDelete={(id) => {
+            if (deleteMutation.isPending) return;
+            deleteMutation.mutate(id);
+          }}
         />
       </CardContent>
     </Card>

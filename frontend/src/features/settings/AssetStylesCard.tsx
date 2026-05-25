@@ -1,8 +1,14 @@
 import { useState } from "react";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useStylesMutation, useStylesQuery } from "./useStylesMutation";
+
+const stylesInputSchema = z.record(
+  z.string(),
+  z.object({ colorHex: z.string().nullable(), riskLevel: z.string().nullable() })
+);
 
 export function AssetStylesCard() {
   const stylesQuery = useStylesQuery(true);
@@ -27,7 +33,7 @@ export function AssetStylesCard() {
           size="sm"
           onClick={() => {
             try {
-              const parsed = JSON.parse(styleJson);
+              const parsed = stylesInputSchema.parse(JSON.parse(styleJson));
               stylesMutation.mutate(parsed);
             } catch {
               alert("Invalid JSON");

@@ -7,7 +7,9 @@ import { useAuthStore } from "./authStore";
 /**
  * Sync server session → client zustand store.
  *
- * Returns the underlying query so the consumer can inspect loading/error if needed.
+ * Returns the underlying query so the consumer can show a loading state
+ * before the first session response lands (otherwise the gate falls through
+ * to LoginScreen for one paint even for authenticated users).
  *
  * The effect re-runs whenever `user` changes (and on session data updates).
  * The two conditions guard against an infinite loop: setUser(session.user)
@@ -21,8 +23,8 @@ export function useSessionSync() {
 
   const sessionQuery = useQuery({
     queryKey: ["session"],
-    queryFn: async () =>
-      apiFetch("/api/v1/auth/session", { method: "GET" }, (raw) => sessionSchema.parse(raw).data)
+    queryFn: async ({ signal }) =>
+      apiFetch("/api/v1/auth/session", { method: "GET", signal }, (raw) => sessionSchema.parse(raw).data)
   });
 
   useEffect(() => {

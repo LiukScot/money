@@ -9,7 +9,7 @@ type Props = {
 
 export function SettingsPanel({ onPurged }: Props) {
   return (
-    <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <PreferencesCard />
       <AssetStylesCard />
       <BackupCard />

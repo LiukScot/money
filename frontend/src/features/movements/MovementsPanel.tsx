@@ -29,7 +29,11 @@ export function MovementsPanel() {
         <MovementForm
           form={form}
           editingId={editingId}
-          onSubmit={(values) => mmMutation.mutate(values)}
+          isSubmitting={mmMutation.isPending}
+          onSubmit={(values) => {
+            if (mmMutation.isPending) return;
+            mmMutation.mutate(values);
+          }}
           onCancel={() => {
             setEditingId(null);
             form.reset(mmFormDefaults);
@@ -41,7 +45,10 @@ export function MovementsPanel() {
             setEditingId(row.id);
             form.reset({ name: row.name, direction: row.direction, amount: row.amount, note: row.note });
           }}
-          onDelete={(id) => deleteMutation.mutate(id)}
+          onDelete={(id) => {
+            if (deleteMutation.isPending) return;
+            deleteMutation.mutate(id);
+          }}
         />
       </CardContent>
     </Card>

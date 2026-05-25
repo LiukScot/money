@@ -20,8 +20,8 @@ export function useLoginMutation(onAfterSuccess?: () => void) {
     onSuccess: async () => {
       const session = await queryClient.fetchQuery({
         queryKey: ["session"],
-        queryFn: async () =>
-          apiFetch("/api/v1/auth/session", { method: "GET" }, (raw) => sessionSchema.parse(raw).data)
+        queryFn: async ({ signal }) =>
+          apiFetch("/api/v1/auth/session", { method: "GET", signal }, (raw) => sessionSchema.parse(raw).data)
       });
       if (session.authenticated && session.user) {
         setUser(session.user);

@@ -15,14 +15,15 @@ import type { MmFormValues } from "./schemas";
 type Props = {
   form: UseFormReturn<MmFormValues>;
   editingId: string | null;
+  isSubmitting: boolean;
   onSubmit: (values: MmFormValues) => void;
   onCancel: () => void;
 };
 
-export function MovementForm({ form, editingId, onSubmit, onCancel }: Props) {
+export function MovementForm({ form, editingId, isSubmitting, onSubmit, onCancel }: Props) {
   return (
     <form className="grid gap-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         <Field id="mm-name" label="Name">
           <Input id="mm-name" type="text" {...form.register("name")} />
         </Field>
@@ -51,7 +52,7 @@ export function MovementForm({ form, editingId, onSubmit, onCancel }: Props) {
         </Field>
       </div>
       <div className="flex gap-2 flex-wrap">
-        <Button type="submit">{editingId ? "Update" : "Add"}</Button>
+        <Button type="submit" disabled={isSubmitting}>{editingId ? "Update" : "Add"}</Button>
         {editingId && (
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel

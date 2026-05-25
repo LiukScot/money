@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { z } from "zod";
 import { apiEnvelopeSchema, apiFetch } from "@/lib";
 import type { ChangePasswordValues } from "./schemas";
@@ -21,7 +22,7 @@ export function useChangePasswordMutation(onAfterSuccess?: () => void) {
       ),
     onSuccess: () => {
       onAfterSuccess?.();
-      alert("Password updated");
+      toast.success("Password updated");
     }
   });
 }

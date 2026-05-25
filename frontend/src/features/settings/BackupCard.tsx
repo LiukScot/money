@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { useBackupActions } from "./useBackupActions";
 export function BackupCard() {
   const { exportJson, importJson, exportXlsx, importXlsx } = useBackupActions();
 
-  const reportError = (err: unknown) => alert((err as Error).message);
+  const reportError = (err: unknown) => toast.error((err as Error).message);
 
   return (
     <Card>

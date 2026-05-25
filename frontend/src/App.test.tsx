@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 
 vi.mock("react-chartjs-2", () => ({
   Pie: () => null,
@@ -10,16 +11,19 @@ vi.mock("react-chartjs-2", () => ({
   Doughnut: () => null
 }));
 
-import App from "./App.tsx";
+import { createAppRouter } from "./router.tsx";
 import { resetTestState, testState } from "./test-msw.ts";
 
 function renderApp() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
   });
+  const router = createAppRouter({
+    history: createMemoryHistory({ initialEntries: ["/"] })
+  });
   return render(
     <QueryClientProvider client={client}>
-      <App />
+      <RouterProvider router={router} />
     </QueryClientProvider>
   );
 }
@@ -87,7 +91,7 @@ describe("Dashboard panel (authenticated state)", () => {
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
     for (const item of ["dashboard", "transactions", "movements", "snapshots", "settings"]) {
-      expect(screen.getByRole("button", { name: item })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: item })).toBeInTheDocument();
     }
   });
 
@@ -95,7 +99,7 @@ describe("Dashboard panel (authenticated state)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "transactions" }));
+    await user.click(screen.getByRole("link", { name: "transactions" }));
     expect(await screen.findByRole("heading", { name: "Transactions" })).toBeInTheDocument();
   });
 
@@ -164,7 +168,7 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "transactions" }));
+    await user.click(screen.getByRole("link", { name: "transactions" }));
     const tipoTrigger = await screen.findByLabelText("Tipo");
     await user.click(tipoTrigger);
     const optionNames = (await screen.findAllByRole("option")).map((o) => o.textContent);
@@ -175,7 +179,7 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "transactions" }));
+    await user.click(screen.getByRole("link", { name: "transactions" }));
     await screen.findByLabelText("Tipo");
     expect(screen.getByLabelText("Buy value")).toBeInTheDocument();
     expect(screen.queryByLabelText("PnL")).toBeNull();
@@ -185,7 +189,7 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "transactions" }));
+    await user.click(screen.getByRole("link", { name: "transactions" }));
     const tipoTrigger = await screen.findByLabelText("Tipo");
     await user.click(tipoTrigger);
     await user.click(await screen.findByRole("option", { name: "cedola" }));
@@ -203,7 +207,7 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "transactions" }));
+    await user.click(screen.getByRole("link", { name: "transactions" }));
     const assetInput = (await screen.findByLabelText("Asset")) as HTMLInputElement;
     assetInput.focus();
     await waitFor(() => expect(screen.getByRole("option", { name: "ETF-A" })).toBeInTheDocument());
@@ -220,7 +224,7 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "transactions" }));
+    await user.click(screen.getByRole("link", { name: "transactions" }));
     const assetInput = (await screen.findByLabelText("Asset")) as HTMLInputElement;
     assetInput.focus();
     await waitFor(() => expect(screen.queryByRole("listbox")).toBeInTheDocument());
@@ -236,7 +240,7 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "transactions" }));
+    await user.click(screen.getByRole("link", { name: "transactions" }));
     const assetInput = await screen.findByLabelText("Asset");
     await user.click(assetInput);
     const optionA = await screen.findByRole("option", { name: "ETF-A" });
@@ -256,7 +260,7 @@ describe("Snapshot auto-derive (issue #51)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "snapshots" }));
+    await user.click(screen.getByRole("link", { name: "snapshots" }));
     await screen.findByRole("heading", { name: "Monthly snapshots" });
     expect(screen.queryByLabelText("Low risk")).toBeNull();
     expect(screen.queryByLabelText("Medium risk")).toBeNull();
@@ -288,7 +292,7 @@ describe("Snapshot auto-derive (issue #51)", () => {
       const user = userEvent.setup();
       renderApp();
       await screen.findByRole("heading", { name: "Dashboard" });
-      await user.click(screen.getByRole("button", { name: "snapshots" }));
+      await user.click(screen.getByRole("link", { name: "snapshots" }));
       await screen.findByRole("heading", { name: "Monthly snapshots" });
       await user.click(screen.getByRole("button", { name: "Add" }));
       await waitFor(() => {
@@ -313,7 +317,7 @@ describe("Empty number inputs (placeholder, no inserted 0)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "transactions" }));
+    await user.click(screen.getByRole("link", { name: "transactions" }));
     const buy = (await screen.findByLabelText("Buy value")) as HTMLInputElement;
     expect(buy.value).toBe("");
     expect(buy.placeholder).toBe("0");
@@ -333,7 +337,7 @@ describe("Empty number inputs (placeholder, no inserted 0)", () => {
       const user = userEvent.setup();
       renderApp();
       await screen.findByRole("heading", { name: "Dashboard" });
-      await user.click(screen.getByRole("button", { name: "transactions" }));
+      await user.click(screen.getByRole("link", { name: "transactions" }));
       await screen.findByLabelText("Buy value");
       await user.type(screen.getByLabelText("Asset"), "TEST");
       await user.click(screen.getByRole("button", { name: "Add" }));
@@ -350,11 +354,11 @@ describe("Empty number inputs (placeholder, no inserted 0)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "movements" }));
+    await user.click(screen.getByRole("link", { name: "movements" }));
     const amount = (await screen.findByLabelText("Amount")) as HTMLInputElement;
     expect(amount.value).toBe("");
     expect(amount.placeholder).toBe("0");
-    await user.click(screen.getByRole("button", { name: "snapshots" }));
+    await user.click(screen.getByRole("link", { name: "snapshots" }));
     const liquid = (await screen.findByLabelText("Liquid")) as HTMLInputElement;
     expect(liquid.value).toBe("");
     expect(liquid.placeholder).toBe("0");
@@ -373,7 +377,7 @@ describe("Snapshot table is add/delete-only (no edit)", () => {
     const user = userEvent.setup();
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByRole("button", { name: "snapshots" }));
+    await user.click(screen.getByRole("link", { name: "snapshots" }));
     await screen.findByRole("heading", { name: "Monthly snapshots" });
     const rowActions = document.querySelectorAll("table tbody tr td:last-child button");
     const labels = Array.from(rowActions).map((b) => b.textContent);

@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEnvelopeSchema, apiFetch, formatCurrency } from "./lib";
-import { mmSchema, txSchema } from "./types";
+import { mmSchema } from "./types";
 import { DashboardPanel } from "@/features/dashboard/DashboardPanel";
 import { SnapshotsPanel } from "@/features/snapshots/SnapshotsPanel";
+import { TransactionsPanel } from "@/features/transactions/TransactionsPanel";
 import { useAuthStore } from "@/shared/auth/authStore";
 import { useSessionSync } from "@/shared/auth/useSessionSync";
 import { sessionSchema } from "@/shared/auth/sessionSchema";
@@ -28,18 +29,6 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const TIPO_OPTIONS = ["nuovo vincolo", "cedola", "interessi", "cashback", "Variazione Valore"] as const;
-const TIPO_PNL_ONLY = new Set<string>(["cedola", "interessi", "cashback", "Variazione Valore"]);
-const TIPO_BUY_ONLY = new Set<string>(["nuovo vincolo"]);
-function tipoShowsBuyValue(tipo: string): boolean {
-  if (TIPO_PNL_ONLY.has(tipo)) return false;
-  return true;
-}
-function tipoShowsPnl(tipo: string): boolean {
-  if (TIPO_BUY_ONLY.has(tipo)) return false;
-  return true;
-}
-
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1)
@@ -52,15 +41,6 @@ const changePasswordSchema = z
     confirmPassword: z.string().min(8)
   })
   .refine((v) => v.newPassword === v.confirmPassword, { path: ["confirmPassword"], message: "Passwords do not match" });
-
-const txFormSchema = z.object({
-  txDate: z.string().min(1),
-  asset: z.string().min(1),
-  tipo: z.string().min(1),
-  buyValue: z.coerce.number(),
-  pnl: z.coerce.number(),
-  note: z.string().default("")
-});
 
 const mmFormSchema = z.object({
   name: z.string().min(1),
@@ -76,18 +56,11 @@ function App() {
   const queryClient = useQueryClient();
   const { user, setUser } = useAuthStore();
   const [nav, setNav] = useState<NavItem>("dashboard");
-  const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [editingMmId, setEditingMmId] = useState<string | null>(null);
   const [styleJson, setStyleJson] = useState("{}");
   const [accountOpen, setAccountOpen] = useState(false);
 
   useSessionSync();
-
-  const txQuery = useQuery({
-    queryKey: ["transactions"],
-    enabled: !!user,
-    queryFn: async () => apiFetch("/api/v1/transactions", { method: "GET" }, (raw) => apiEnvelopeSchema(z.array(txSchema)).parse(raw).data)
-  });
 
   const mmQuery = useQuery({
     queryKey: ["movements"],
@@ -119,71 +92,6 @@ function App() {
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({ resolver: zodResolver(loginSchema) });
   const changePasswordForm = useForm<z.infer<typeof changePasswordSchema>>({ resolver: zodResolver(changePasswordSchema) });
-  const txForm = useForm<z.infer<typeof txFormSchema>>({
-    defaultValues: {
-      txDate: new Date().toISOString().slice(0, 10),
-      asset: "",
-      tipo: "nuovo vincolo",
-      // empty string renders placeholder in number input; z.coerce.number maps "" → 0 at submit
-      buyValue: "" as unknown as number,
-      pnl: "" as unknown as number,
-      note: ""
-    }
-  });
-  const watchedTipo = txForm.watch("tipo");
-  const showBuyValue = tipoShowsBuyValue(watchedTipo);
-  const showPnl = tipoShowsPnl(watchedTipo);
-
-  const assetOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const row of txQuery.data ?? []) {
-      if (row.asset) set.add(row.asset);
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [txQuery.data]);
-
-  const [assetComboOpen, setAssetComboOpen] = useState(false);
-  const [assetFocusedIdx, setAssetFocusedIdx] = useState(-1);
-  const watchedAsset = txForm.watch("asset");
-  const filteredAssetOptions = useMemo(() => {
-    const q = (watchedAsset ?? "").toLowerCase().trim();
-    if (!q) return assetOptions;
-    return assetOptions.filter((a) => a.toLowerCase().includes(q) && a.toLowerCase() !== q);
-  }, [assetOptions, watchedAsset]);
-
-  useEffect(() => {
-    setAssetFocusedIdx(-1);
-  }, [watchedAsset, assetComboOpen]);
-
-  const visibleAssetOptions = filteredAssetOptions.slice(0, 8);
-  const selectAssetOption = (a: string) => {
-    txForm.setValue("asset", a, { shouldDirty: true });
-    setAssetComboOpen(false);
-    setAssetFocusedIdx(-1);
-  };
-  const handleAssetKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (!assetComboOpen) setAssetComboOpen(true);
-      setAssetFocusedIdx((i) => (visibleAssetOptions.length === 0 ? -1 : (i + 1) % visibleAssetOptions.length));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (!assetComboOpen) setAssetComboOpen(true);
-      setAssetFocusedIdx((i) => {
-        if (visibleAssetOptions.length === 0) return -1;
-        return i <= 0 ? visibleAssetOptions.length - 1 : i - 1;
-      });
-    } else if (e.key === "Enter" && assetComboOpen && assetFocusedIdx >= 0) {
-      const choice = visibleAssetOptions[assetFocusedIdx];
-      if (choice) {
-        e.preventDefault();
-        selectAssetOption(choice);
-      }
-    } else if (e.key === "Escape" && assetComboOpen) {
-      e.preventDefault();
-      setAssetComboOpen(false);
-    }
-  };
   const mmForm = useForm<z.infer<typeof mmFormSchema>>({
     defaultValues: {
       name: "",
@@ -229,40 +137,6 @@ function App() {
     onSuccess: () => {
       changePasswordForm.reset();
       alert("Password updated");
-    }
-  });
-
-  const txMutation = useMutation({
-    mutationFn: async (values: z.infer<typeof txFormSchema>) => {
-      const parsed = txFormSchema.parse(values);
-      const buyValue = tipoShowsBuyValue(parsed.tipo) ? Number(parsed.buyValue) : 0;
-      const pnl = tipoShowsPnl(parsed.tipo) ? Number(parsed.pnl) : 0;
-      const payload = {
-        txDate: parsed.txDate,
-        asset: parsed.asset,
-        tipo: parsed.tipo,
-        buyValue,
-        pnl,
-        currentValue: buyValue + pnl,
-        note: parsed.note
-      };
-      if (editingTxId) {
-        return apiFetch(
-          `/api/v1/transactions/${editingTxId}`,
-          { method: "PUT", body: JSON.stringify(payload) },
-          (raw) => apiEnvelopeSchema(z.object({ ok: z.boolean() })).parse(raw).data
-        );
-      }
-      return apiFetch(
-        "/api/v1/transactions",
-        { method: "POST", body: JSON.stringify(payload) },
-        (raw) => apiEnvelopeSchema(z.object({ id: z.string() })).parse(raw).data
-      );
-    },
-    onSuccess: async () => {
-      setEditingTxId(null);
-      txForm.reset({ txDate: new Date().toISOString().slice(0, 10), asset: "", tipo: "nuovo vincolo", buyValue: "" as unknown as number, pnl: "" as unknown as number, note: "" });
-      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     }
   });
 
@@ -461,166 +335,7 @@ function App() {
 
       {nav === "dashboard" && <DashboardPanel />}
 
-      {nav === "transactions" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Transactions</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-6">
-            <form className="grid gap-4" onSubmit={txForm.handleSubmit((v) => txMutation.mutate(v))}>
-              <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
-                <Field id="tx-date" label="Date">
-                  <Input id="tx-date" type="date" {...txForm.register("txDate")} />
-                </Field>
-                <div className="grid gap-1.5 relative">
-                  <Label htmlFor="tx-asset">Asset</Label>
-                  <Input
-                    id="tx-asset"
-                    type="text"
-                    autoComplete="off"
-                    placeholder={assetOptions.length > 0 ? "digita o scegli" : "es. revolut"}
-                    role="combobox"
-                    aria-expanded={assetComboOpen}
-                    aria-controls="tx-asset-combo-list"
-                    aria-activedescendant={assetComboOpen && assetFocusedIdx >= 0 ? `tx-asset-opt-${assetFocusedIdx}` : undefined}
-                    {...txForm.register("asset")}
-                    onFocus={() => setAssetComboOpen(true)}
-                    onBlur={() => window.setTimeout(() => setAssetComboOpen(false), 120)}
-                    onKeyDown={handleAssetKeyDown}
-                  />
-                  {assetComboOpen && visibleAssetOptions.length > 0 && (
-                    <ul
-                      id="tx-asset-combo-list"
-                      role="listbox"
-                      className="absolute inset-x-0 top-full mt-1 z-20 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg"
-                    >
-                      {visibleAssetOptions.map((a, idx) => (
-                        <li key={a} id={`tx-asset-opt-${idx}`} role="option" aria-selected={assetFocusedIdx === idx}>
-                          <button
-                            type="button"
-                            className={`w-full text-left rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground ${assetFocusedIdx === idx ? "bg-accent text-accent-foreground" : ""}`}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              selectAssetOption(a);
-                            }}
-                          >
-                            {a}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <Field id="tx-tipo" label="Tipo">
-                  <Controller
-                    control={txForm.control}
-                    name="tipo"
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger id="tx-tipo">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TIPO_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </Field>
-                {showBuyValue && (
-                  <Field id="tx-buyValue" label="Buy value">
-                    <Input id="tx-buyValue" type="number" step="0.01" placeholder="0" {...txForm.register("buyValue")} />
-                  </Field>
-                )}
-                {showPnl && (
-                  <Field id="tx-pnl" label="PnL">
-                    <Input id="tx-pnl" type="number" step="0.01" placeholder="0" {...txForm.register("pnl")} />
-                  </Field>
-                )}
-                <Field id="tx-note" label="Note">
-                  <Textarea id="tx-note" {...txForm.register("note")} />
-                </Field>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <Button type="submit">{editingTxId ? "Update" : "Add"}</Button>
-                {editingTxId && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setEditingTxId(null);
-                      txForm.reset({
-                        txDate: new Date().toISOString().slice(0, 10),
-                        asset: "",
-                        tipo: "nuovo vincolo",
-                        buyValue: "" as unknown as number,
-                        pnl: "" as unknown as number,
-                        note: ""
-                      });
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                )}
-              </div>
-            </form>
-
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Asset</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Current</TableHead>
-                  <TableHead>PnL</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(txQuery.data ?? []).map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{row.txDate}</TableCell>
-                    <TableCell>{row.asset}</TableCell>
-                    <TableCell>{row.tipo}</TableCell>
-                    <TableCell>{formatCurrency(row.currentValue)}</TableCell>
-                    <TableCell>{formatCurrency(row.pnl)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingTxId(row.id);
-                            txForm.reset({
-                              txDate: row.txDate,
-                              asset: row.asset,
-                              tipo: row.tipo,
-                              buyValue: row.buyValue,
-                              pnl: row.pnl,
-                              note: row.note
-                            });
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteMutation.mutate({ path: `/api/v1/transactions/${row.id}` })}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+      {nav === "transactions" && <TransactionsPanel />}
 
       {nav === "movements" && (
         <Card>

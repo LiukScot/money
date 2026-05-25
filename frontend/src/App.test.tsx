@@ -208,7 +208,7 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
     await user.click(screen.getByRole("link", { name: "transactions" }));
-    const assetInput = (await screen.findByLabelText("Asset")) as HTMLInputElement;
+    const assetInput = (await screen.findByRole("combobox", { name: "Asset" })) as HTMLInputElement;
     assetInput.focus();
     await waitFor(() => expect(screen.getByRole("option", { name: "ETF-A" })).toBeInTheDocument());
     await user.keyboard("{ArrowDown}");
@@ -225,7 +225,7 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
     await user.click(screen.getByRole("link", { name: "transactions" }));
-    const assetInput = (await screen.findByLabelText("Asset")) as HTMLInputElement;
+    const assetInput = (await screen.findByRole("combobox", { name: "Asset" })) as HTMLInputElement;
     assetInput.focus();
     await waitFor(() => expect(screen.queryByRole("listbox")).toBeInTheDocument());
     await user.keyboard("{Escape}");
@@ -241,12 +241,12 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
     await user.click(screen.getByRole("link", { name: "transactions" }));
-    const assetInput = await screen.findByLabelText("Asset");
+    const assetInput = await screen.findByRole("combobox", { name: "Asset" });
     await user.click(assetInput);
     const optionA = await screen.findByRole("option", { name: "ETF-A" });
     expect(optionA).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "ETF-B" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "ETF-A" }));
+    await user.click(screen.getByRole("option", { name: "ETF-A" }));
     expect((assetInput as HTMLInputElement).value).toBe("ETF-A");
   });
 });
@@ -339,7 +339,7 @@ describe("Empty number inputs (placeholder, no inserted 0)", () => {
       await screen.findByRole("heading", { name: "Dashboard" });
       await user.click(screen.getByRole("link", { name: "transactions" }));
       await screen.findByLabelText("Buy value");
-      await user.type(screen.getByLabelText("Asset"), "TEST");
+      await user.type(screen.getByRole("combobox", { name: "Asset" }), "TEST");
       await user.click(screen.getByRole("button", { name: "Add" }));
       await waitFor(() => {
         expect(captured).not.toBeNull();

@@ -17,7 +17,9 @@ const envSchema = z.object({
     .string()
     .default("http://localhost:5174,http://127.0.0.1:5174,http://localhost:8001,http://127.0.0.1:8001"),
   PUBLIC_DIR: z.string().default(path.resolve(process.cwd(), "../frontend/dist")),
-  COOKIE_SECURE: z.string().default("false")
+  COOKIE_SECURE: z.string().default("false"),
+  LOGIN_RATE_LIMIT_MAX: z.coerce.number().default(5),
+  LOGIN_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().default(15 * 60)
 });
 
 const env = envSchema.parse(process.env);

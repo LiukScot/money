@@ -28,11 +28,16 @@ const PUBLIC_AUTH_PATHS = new Set([
 export function createApi(opts: CreateApiOptions) {
   const app = new Hono<AppEnv>();
 
-  // Per-instance rate limiter: 5 login attempts per IP per 15 min.
-  // argon2id verify is ~100 ms; without this cap an unauthenticated
-  // caller can pin a CPU core forever. Lives on the API instance so
-  // tests get a fresh bucket per createApi() call.
-  const loginRateLimiter = createRateLimiter(5, 15 * 60 * 1000);
+  // Per-instance rate limiter: defaults to 5 login attempts per IP per
+  // 15 min, configurable via LOGIN_RATE_LIMIT_MAX and
+  // LOGIN_RATE_LIMIT_WINDOW_SECONDS. argon2id verify is ~100 ms; without
+  // this cap an unauthenticated caller can pin a CPU core. Lives on the
+  // API instance so each createApi() call gets a fresh bucket.
+  // Set LOGIN_RATE_LIMIT_MAX=0 to disable (e.g. E2E test runs).
+  const loginRateLimiter = createRateLimiter(
+    opts.env.LOGIN_RATE_LIMIT_MAX,
+    opts.env.LOGIN_RATE_LIMIT_WINDOW_SECONDS * 1000
+  );
 
   app.use("*", securityHeaders);
   app.use("*", async (c, next) => {

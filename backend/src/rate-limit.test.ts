@@ -29,6 +29,13 @@ describe("createRateLimiter (unit)", () => {
     expect(limiter.check("ip-1").allowed).toBe(true);
   });
 
+  test("maxAttempts=0 disables the limiter", () => {
+    const limiter = createRateLimiter(0, 60_000);
+    for (let i = 0; i < 100; i += 1) {
+      expect(limiter.check("ip-1").allowed).toBe(true);
+    }
+  });
+
   test("expired window allows next attempt", async () => {
     const limiter = createRateLimiter(1, 1);
     expect(limiter.check("ip-1").allowed).toBe(true);

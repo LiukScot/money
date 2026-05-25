@@ -34,9 +34,14 @@ export type RateLimiter = {
 
 export function createRateLimiter(maxAttempts: number, windowMs: number): RateLimiter {
   const buckets = new Map<string, Bucket>();
+  // maxAttempts === 0 means "disabled" — every check returns allowed.
+  // Useful for E2E test suites that hammer login from one IP and would
+  // otherwise trip the limit on the first test file.
+  const disabled = maxAttempts <= 0;
 
   return {
     check(key: string): RateLimitResult {
+      if (disabled) return { allowed: true, retryAfterSeconds: 0 };
       const now = Date.now();
       const existing = buckets.get(key);
       if (!existing || existing.resetAt <= now) {

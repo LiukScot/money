@@ -24,7 +24,7 @@ export default defineConfig({
   webServer: externalBaseURL
     ? undefined
     : {
-        command: `rm -f ${quoteShell(smokeDbPath)} ${quoteShell(`${smokeDbPath}-shm`)} ${quoteShell(`${smokeDbPath}-wal`)} && DB_PATH=${quoteShell(smokeDbPath)} npm run smoke:seed && PORT=${smokePort} DB_PATH=${quoteShell(smokeDbPath)} npm run smoke:serve`,
+        command: `rm -f ${quoteShell(smokeDbPath)} ${quoteShell(`${smokeDbPath}-shm`)} ${quoteShell(`${smokeDbPath}-wal`)} && DB_PATH=${quoteShell(smokeDbPath)} npm run smoke:seed && PORT=${smokePort} DB_PATH=${quoteShell(smokeDbPath)} LOGIN_RATE_LIMIT_MAX=0 npm run smoke:serve`,
         port: smokePort,
         reuseExistingServer: !process.env.CI,
         timeout: 180_000

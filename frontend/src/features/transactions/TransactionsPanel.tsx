@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TransactionForm } from "./TransactionForm";
 import { TransactionsTable } from "./TransactionsTable";
 import { useTransactionsQuery } from "./useTransactionsQuery";
-import { useTxMutation } from "./useTxMutations";
+import { useTxMutation } from "./useTxMutation";
 import { useDeleteTransaction } from "./useDeleteTransaction";
 import { txFormDefaults, type TxFormValues } from "./schemas";
 

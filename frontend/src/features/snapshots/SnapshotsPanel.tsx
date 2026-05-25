@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { apiEnvelopeSchema, apiFetch } from "@/lib";
 import { txSchema, type StylesMap } from "@/types";
@@ -9,10 +10,17 @@ import { SnapshotsTable } from "./SnapshotsTable";
 import { useSnapshotsQuery } from "./useSnapshotsQuery";
 import { useSnapMutation } from "./useSnapMutation";
 import { useDeleteSnapshot } from "./useDeleteSnapshot";
+import { type SnapFormValues } from "./schemas";
 
 const stylesShape = apiEnvelopeSchema(
   z.record(z.string(), z.object({ colorHex: z.string().nullable(), riskLevel: z.string().nullable() }))
 );
+
+const snapDefaults: SnapFormValues = {
+  snapshotDate: new Date().toISOString().slice(0, 10),
+  // empty string renders placeholder in number input; z.coerce.number maps "" → 0 at submit
+  liquid: "" as unknown as number
+};
 
 export function SnapshotsPanel() {
   const snapQuery = useSnapshotsQuery(true);
@@ -32,7 +40,13 @@ export function SnapshotsPanel() {
       apiFetch("/api/v1/assets/styles", { method: "GET" }, (raw) => stylesShape.parse(raw).data as StylesMap)
   });
 
-  const snapMutation = useSnapMutation(() => {});
+  const form = useForm<SnapFormValues>({
+    defaultValues: { ...snapDefaults }
+  });
+
+  const snapMutation = useSnapMutation(() => {
+    form.reset({ snapshotDate: new Date().toISOString().slice(0, 10), liquid: "" as unknown as number });
+  });
   const deleteMutation = useDeleteSnapshot();
 
   const ready = txQuery.isSuccess && stylesQuery.isSuccess;
@@ -45,6 +59,7 @@ export function SnapshotsPanel() {
       <CardContent className="grid gap-6">
         <MonthlyRiskChart snapshots={snapQuery.data ?? []} />
         <SnapshotForm
+          form={form}
           disabled={!ready}
           onSubmit={(values) => snapMutation.mutate(values)}
         />

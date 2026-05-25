@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MovementForm } from "./MovementForm";
 import { MovementsTable } from "./MovementsTable";
 import { useMovementsQuery } from "./useMovementsQuery";
-import { useMmMutation } from "./useMmMutations";
+import { useMmMutation } from "./useMmMutation";
 import { useDeleteMovement } from "./useDeleteMovement";
 import { mmFormDefaults, type MmFormValues } from "./schemas";
 

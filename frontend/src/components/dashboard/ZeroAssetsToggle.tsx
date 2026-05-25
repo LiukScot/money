@@ -1,3 +1,6 @@
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+
 const INPUT_ID = "show-zero-assets";
 
 export function ZeroAssetsToggle({
@@ -10,16 +13,15 @@ export function ZeroAssetsToggle({
   disabled?: boolean;
 }) {
   return (
-    <label className="zero-toggle" htmlFor={INPUT_ID}>
-      <input
+    <Label htmlFor={INPUT_ID} className="inline-flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+      <Checkbox
         id={INPUT_ID}
         name={INPUT_ID}
-        type="checkbox"
         checked={checked}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
+        onCheckedChange={(c) => onChange(c === true)}
       />
       Show zero-value assets
-    </label>
+    </Label>
   );
 }

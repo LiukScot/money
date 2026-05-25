@@ -29,9 +29,9 @@ beforeEach(() => {
 });
 
 describe("Login form (unauthenticated state)", () => {
-  test("renders myMoney heading and login form when not authenticated", async () => {
+  test("renders money heading and login form when not authenticated", async () => {
     renderApp();
-    expect(await screen.findByRole("heading", { name: "myMoney" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "money" })).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
@@ -165,9 +165,9 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
     await user.click(screen.getByRole("button", { name: "transactions" }));
-    const tipoSelect = await screen.findByLabelText("Tipo");
-    expect(tipoSelect.tagName).toBe("SELECT");
-    const optionNames = Array.from(tipoSelect.querySelectorAll("option")).map((o) => o.textContent);
+    const tipoTrigger = await screen.findByLabelText("Tipo");
+    await user.click(tipoTrigger);
+    const optionNames = (await screen.findAllByRole("option")).map((o) => o.textContent);
     expect(optionNames).toEqual(["nuovo vincolo", "cedola", "interessi", "cashback", "Variazione Valore"]);
   });
 
@@ -186,8 +186,9 @@ describe("Transactions form dynamic fields (issue #51)", () => {
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
     await user.click(screen.getByRole("button", { name: "transactions" }));
-    const tipo = await screen.findByLabelText("Tipo");
-    await user.selectOptions(tipo, "cedola");
+    const tipoTrigger = await screen.findByLabelText("Tipo");
+    await user.click(tipoTrigger);
+    await user.click(await screen.findByRole("option", { name: "cedola" }));
     await waitFor(() => {
       expect(screen.queryByLabelText("Buy value")).toBeNull();
       expect(screen.getByLabelText("PnL")).toBeInTheDocument();
@@ -390,7 +391,7 @@ describe("Logout flow", () => {
     await user.click(screen.getByText("Account"));
     await user.click(screen.getByRole("button", { name: /log out/i }));
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "myMoney" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "money" })).toBeInTheDocument();
     });
   });
 });

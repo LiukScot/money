@@ -47,7 +47,7 @@ describe("migrate.ts", () => {
     expect(names).toContain("asset_styles");
     expect(names).toContain("user_preferences");
     expect(names).toContain("user_sessions");
-    expect(names).toContain("app_meta");
+    expect(names).toContain("__drizzle_migrations");
     db.close();
   });
 

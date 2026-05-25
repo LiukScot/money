@@ -1,5 +1,7 @@
 import path from "node:path";
-import { openDb, runMigrations } from "./db.ts";
+import { eq, sql } from "drizzle-orm";
+import { getDrizzle, openDb, runMigrations } from "./db.ts";
+import { users } from "./db/schema.ts";
 
 const dbPath = process.env.DB_PATH || path.resolve(process.cwd(), "../data/mymoney.sqlite");
 const cmd = process.argv[2];
@@ -20,9 +22,21 @@ function required(name: string): string {
 async function main() {
   const db = openDb(dbPath);
   runMigrations(db);
+  const dbo = getDrizzle(db);
 
   if (cmd === "list") {
-    const rows = db.query(`SELECT id, email, name, disabled_at, created_at, updated_at FROM users ORDER BY id ASC`).all() as any[];
+    const rows = dbo
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        disabled_at: users.disabled_at,
+        created_at: users.created_at,
+        updated_at: users.updated_at
+      })
+      .from(users)
+      .orderBy(users.id)
+      .all();
     console.table(rows);
     db.close();
     return;
@@ -33,7 +47,7 @@ async function main() {
     const password = required("password");
     const name = arg("name") ?? null;
     const hash = await Bun.password.hash(password, { algorithm: "argon2id" });
-    db.query(`INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)`).run(email, hash, name);
+    dbo.insert(users).values({ email, password_hash: hash, name }).run();
     console.log(`User created: ${email}`);
     db.close();
     return;
@@ -43,8 +57,13 @@ async function main() {
     const email = required("email").trim().toLowerCase();
     const password = required("password");
     const hash = await Bun.password.hash(password, { algorithm: "argon2id" });
-    const result = db.query(`UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE email = ?`).run(hash, email);
-    if (!result.changes) throw new Error(`User not found: ${email}`);
+    const result = dbo
+      .update(users)
+      .set({ password_hash: hash, updated_at: sql`CURRENT_TIMESTAMP` })
+      .where(eq(users.email, email))
+      .returning({ id: users.id })
+      .all();
+    if (result.length === 0) throw new Error(`User not found: ${email}`);
     console.log(`Password reset for ${email}`);
     db.close();
     return;
@@ -52,10 +71,13 @@ async function main() {
 
   if (cmd === "disable") {
     const email = required("email").trim().toLowerCase();
-    const result = db
-      .query(`UPDATE users SET disabled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE email = ?`)
-      .run(email);
-    if (!result.changes) throw new Error(`User not found: ${email}`);
+    const result = dbo
+      .update(users)
+      .set({ disabled_at: sql`CURRENT_TIMESTAMP`, updated_at: sql`CURRENT_TIMESTAMP` })
+      .where(eq(users.email, email))
+      .returning({ id: users.id })
+      .all();
+    if (result.length === 0) throw new Error(`User not found: ${email}`);
     console.log(`Disabled user: ${email}`);
     db.close();
     return;
@@ -63,8 +85,13 @@ async function main() {
 
   if (cmd === "enable") {
     const email = required("email").trim().toLowerCase();
-    const result = db.query(`UPDATE users SET disabled_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE email = ?`).run(email);
-    if (!result.changes) throw new Error(`User not found: ${email}`);
+    const result = dbo
+      .update(users)
+      .set({ disabled_at: null, updated_at: sql`CURRENT_TIMESTAMP` })
+      .where(eq(users.email, email))
+      .returning({ id: users.id })
+      .all();
+    if (result.length === 0) throw new Error(`User not found: ${email}`);
     console.log(`Enabled user: ${email}`);
     db.close();
     return;

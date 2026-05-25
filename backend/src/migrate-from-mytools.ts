@@ -1,7 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Database } from "bun:sqlite";
-import { openDb, runMigrations } from "./db.ts";
+import { eq, sql } from "drizzle-orm";
+import { getDrizzle, openDb, runMigrations } from "./db.ts";
+import {
+  users as usersTbl,
+  transactions as txTbl,
+  monthly_movements as mmTbl,
+  monthly_snapshots as snapTbl,
+  asset_styles as styleTbl,
+  user_preferences as prefTbl
+} from "./db/schema.ts";
 import { inferType } from "./helpers.ts";
 
 type Args = {
@@ -61,9 +70,10 @@ function main() {
   const source = new Database(cfg.source, { readonly: true });
   const target = openDb(cfg.target);
   runMigrations(target);
+  const targetDbo = getDrizzle(target);
 
-  const users = source.query(`SELECT id, email, password_hash, name, created_at, updated_at FROM users ORDER BY id ASC`).all() as any[];
-  const primary = users.find((u) => String(u.email).toLowerCase() === cfg.primaryEmail.toLowerCase());
+  const sourceUsers = source.query(`SELECT id, email, password_hash, name, created_at, updated_at FROM users ORDER BY id ASC`).all() as any[];
+  const primary = sourceUsers.find((u) => String(u.email).toLowerCase() === cfg.primaryEmail.toLowerCase());
   if (!primary) {
     throw new Error(`Primary email ${cfg.primaryEmail} not found in source users table.`);
   }
@@ -89,30 +99,35 @@ function main() {
   };
 
   const tx = target.transaction(() => {
-    const upsertUser = target.query(
-      `INSERT INTO users (id, email, password_hash, name, created_at, updated_at)
-       VALUES (?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP), COALESCE(?, CURRENT_TIMESTAMP))
-       ON CONFLICT(id) DO UPDATE SET
-        email=excluded.email,
-        password_hash=excluded.password_hash,
-        name=excluded.name,
-        updated_at=COALESCE(excluded.updated_at, CURRENT_TIMESTAMP)`
-    );
-
-    users.forEach((user) => {
-      upsertUser.run(user.id, user.email, user.password_hash, user.name ?? null, user.created_at ?? null, user.updated_at ?? null);
+    sourceUsers.forEach((user) => {
+      targetDbo
+        .insert(usersTbl)
+        .values({
+          id: user.id,
+          email: user.email,
+          password_hash: user.password_hash,
+          name: user.name ?? null,
+          ...(user.created_at ? { created_at: user.created_at } : {}),
+          ...(user.updated_at ? { updated_at: user.updated_at } : {})
+        })
+        .onConflictDoUpdate({
+          target: usersTbl.id,
+          set: {
+            email: user.email,
+            password_hash: user.password_hash,
+            name: user.name ?? null,
+            ...(user.updated_at ? { updated_at: user.updated_at } : {})
+          }
+        })
+        .run();
     });
 
-    target.query(`DELETE FROM transactions WHERE user_id = ?`).run(primary.id);
-    target.query(`DELETE FROM monthly_movements WHERE user_id = ?`).run(primary.id);
-    target.query(`DELETE FROM monthly_snapshots WHERE user_id = ?`).run(primary.id);
-    target.query(`DELETE FROM asset_styles WHERE user_id = ?`).run(primary.id);
-    target.query(`DELETE FROM user_preferences WHERE user_id = ?`).run(primary.id);
+    targetDbo.delete(txTbl).where(eq(txTbl.user_id, primary.id)).run();
+    targetDbo.delete(mmTbl).where(eq(mmTbl.user_id, primary.id)).run();
+    targetDbo.delete(snapTbl).where(eq(snapTbl.user_id, primary.id)).run();
+    targetDbo.delete(styleTbl).where(eq(styleTbl.user_id, primary.id)).run();
+    targetDbo.delete(prefTbl).where(eq(prefTbl.user_id, primary.id)).run();
 
-    const insertTx = target.query(
-      `INSERT INTO transactions (id, user_id, tx_date, asset, tipo, derived_type, buy_value, pnl, current_value, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
     transactions.forEach((row: any, idx: number) => {
       const id = String(row.id ?? `tx-${idx}-${Date.now()}`);
       const date = String(row.date ?? "").slice(0, 10);
@@ -123,47 +138,53 @@ function main() {
       const currentValue = Number.isFinite(Number(row.currentValue)) ? safeNum(row.currentValue) : buyValue + pnl;
       const derivedType = String(row.derived_type ?? row.type ?? inferType(tipo, buyValue, pnl));
       const note = String(row.note ?? "");
-      insertTx.run(id, primary.id, date, asset, tipo, derivedType, buyValue, pnl, currentValue, note);
+      targetDbo
+        .insert(txTbl)
+        .values({
+          id,
+          user_id: primary.id,
+          tx_date: date,
+          asset,
+          tipo,
+          derived_type: derivedType,
+          buy_value: buyValue,
+          pnl,
+          current_value: currentValue,
+          note
+        })
+        .run();
     });
 
-    const insertMm = target.query(
-      `INSERT INTO monthly_movements (id, user_id, name, direction, amount, note)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    );
     monthlyMovements.forEach((row: any, idx: number) => {
       const id = String(row.id ?? `mm-${idx}-${Date.now()}`);
-      insertMm.run(
-        id,
-        primary.id,
-        String(row.name ?? ""),
-        String(row.direction ?? "income"),
-        Math.abs(safeNum(row.amount, 0)),
-        String(row.note ?? "")
-      );
+      targetDbo
+        .insert(mmTbl)
+        .values({
+          id,
+          user_id: primary.id,
+          name: String(row.name ?? ""),
+          direction: String(row.direction ?? "income"),
+          amount: Math.abs(safeNum(row.amount, 0)),
+          note: String(row.note ?? "")
+        })
+        .run();
     });
 
-    const insertSnap = target.query(
-      `INSERT INTO monthly_snapshots (id, user_id, snapshot_date, low_risk, medium_risk, high_risk, liquid)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    );
     monthlySnapshots.forEach((row: any, idx: number) => {
       const id = String(row.id ?? `snap-${idx}-${Date.now()}`);
-      insertSnap.run(
-        id,
-        primary.id,
-        String(row.date ?? "").slice(0, 10),
-        safeNum(row.low, 0),
-        safeNum(row.medium, 0),
-        safeNum(row.high, 0),
-        safeNum(row.liquid, 0)
-      );
+      targetDbo
+        .insert(snapTbl)
+        .values({
+          id,
+          user_id: primary.id,
+          snapshot_date: String(row.date ?? "").slice(0, 10),
+          low_risk: safeNum(row.low, 0),
+          medium_risk: safeNum(row.medium, 0),
+          high_risk: safeNum(row.high, 0),
+          liquid: safeNum(row.liquid, 0)
+        })
+        .run();
     });
-
-    const insertStyle = target.query(
-      `INSERT INTO asset_styles (user_id, asset, color_hex, risk_level, updated_at)
-       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-       ON CONFLICT(user_id, asset) DO UPDATE SET color_hex=excluded.color_hex, risk_level=excluded.risk_level, updated_at=CURRENT_TIMESTAMP`
-    );
 
     const assets = new Set<string>([
       ...Object.keys(assetColors),
@@ -174,17 +195,41 @@ function main() {
     assets.forEach((asset) => {
       const color = assetColors[asset] ? String(assetColors[asset]) : null;
       const risk = assetRisks[asset] ? String(assetRisks[asset]) : null;
-      insertStyle.run(primary.id, asset, color, risk);
+      targetDbo
+        .insert(styleTbl)
+        .values({
+          user_id: primary.id,
+          asset,
+          color_hex: color,
+          risk_level: risk
+        })
+        .onConflictDoUpdate({
+          target: [styleTbl.user_id, styleTbl.asset],
+          set: {
+            color_hex: color,
+            risk_level: risk,
+            updated_at: sql`CURRENT_TIMESTAMP`
+          }
+        })
+        .run();
     });
 
-    target
-      .query(
-        `INSERT OR REPLACE INTO user_preferences (user_id, show_zero_assets, updated_at)
-         VALUES (?, ?, CURRENT_TIMESTAMP)`
-      )
-      .run(primary.id, preferences.showZeroAssets ? 1 : 0);
+    targetDbo
+      .insert(prefTbl)
+      .values({
+        user_id: primary.id,
+        show_zero_assets: preferences.showZeroAssets ? 1 : 0
+      })
+      .onConflictDoUpdate({
+        target: prefTbl.user_id,
+        set: {
+          show_zero_assets: preferences.showZeroAssets ? 1 : 0,
+          updated_at: sql`CURRENT_TIMESTAMP`
+        }
+      })
+      .run();
 
-    report.usersCopied = users.length;
+    report.usersCopied = sourceUsers.length;
     report.transactions = transactions.length;
     report.monthlyMovements = monthlyMovements.length;
     report.monthlySnapshots = monthlySnapshots.length;

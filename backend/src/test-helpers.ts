@@ -86,12 +86,14 @@ export function apiRequest(
   const headers: Record<string, string> = { ...(opts.headers ?? {}) };
   if (opts.body !== undefined) headers["content-type"] ??= "application/json";
   if (opts.cookie) headers.cookie = opts.cookie;
-  return api.fetch(
-    new Request(`http://test${path}`, {
-      method: opts.method ?? "GET",
-      headers,
-      body: opts.body === undefined ? null : JSON.stringify(opts.body)
-    })
+  return Promise.resolve(
+    api.fetch(
+      new Request(`http://test${path}`, {
+        method: opts.method ?? "GET",
+        headers,
+        body: opts.body === undefined ? null : JSON.stringify(opts.body)
+      })
+    )
   );
 }
 

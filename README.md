@@ -42,7 +42,9 @@ This writes `data/mymoney-migration-report.json`.
 - `docker compose up --build -d`
 - No Redis service is required.
 
-## Rollback helpers
+## Legacy snapshot
 
-- `rollback/legacy-runtime.tar.gz` stores pre-migration source snapshot.
-- `scripts/rollback-runtime.sh` restores legacy files from that archive.
+Pre-rewrite sources (`/legacy/`, `/rollback/`) live on the
+[`legacy-archive`](https://github.com/LiukScot/money/tree/legacy-archive)
+branch and the `pre-rewrite` git tag — `git checkout pre-rewrite` to
+restore them locally.

@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 import { e2eUser, loginUi } from "./helpers.ts";
 
 test.describe("auth flows", () => {
-  test("renders myMoney login screen at root", async ({ page }) => {
+  test("renders money login screen at root", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "myMoney" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "money" })).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
     await expect(page.getByLabel("Password")).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
@@ -28,7 +28,7 @@ test.describe("auth flows", () => {
     await loginUi(page);
     await page.getByText("Account").click();
     await page.getByRole("button", { name: /log out/i }).click();
-    await expect(page.getByRole("heading", { name: "myMoney" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "money" })).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
   });
 

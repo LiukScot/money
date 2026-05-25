@@ -38,7 +38,7 @@ test.describe("backup import/export journey", () => {
   test("JSON export download exposes user data shape", async ({ page, request }) => {
     await seedTransaction(request, { asset: "ETF-JSON" });
     await loginUi(page);
-    await page.getByRole("button", { name: "settings" }).click();
+    await page.getByRole("link", { name: "settings" }).click();
     await expect(page.getByRole("heading", { name: "Backup" })).toBeVisible();
     const [download] = await Promise.all([
       page.waitForEvent("download"),

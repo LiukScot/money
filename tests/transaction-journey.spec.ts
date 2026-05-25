@@ -9,7 +9,7 @@ test.describe("transaction journey", () => {
   test("add a transaction → dashboard reflects new totals", async ({ page }) => {
     await loginUi(page);
 
-    await page.getByRole("button", { name: "transactions" }).click();
+    await page.getByRole("link", { name: "transactions" }).click();
     await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible();
 
     await page.getByLabel("Date").fill("2026-05-16");
@@ -21,7 +21,7 @@ test.describe("transaction journey", () => {
 
     await expect(page.getByRole("cell", { name: "ETF-A" })).toBeVisible();
 
-    await page.getByRole("button", { name: "dashboard" }).click();
+    await page.getByRole("link", { name: "dashboard" }).click();
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
     const txCard = page.getByRole("heading", { name: "Transactions" }).locator("..");
     await expect(txCard).toContainText("1");
@@ -29,7 +29,7 @@ test.describe("transaction journey", () => {
 
   test("delete a transaction → row disappears", async ({ page }) => {
     await loginUi(page);
-    await page.getByRole("button", { name: "transactions" }).click();
+    await page.getByRole("link", { name: "transactions" }).click();
     await page.getByLabel("Date").fill("2026-05-16");
     await page.getByLabel("Asset").fill("ETF-DEL");
     await page.getByLabel("Tipo").click();

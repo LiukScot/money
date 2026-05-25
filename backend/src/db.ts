@@ -1,7 +1,18 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Database } from "bun:sqlite";
-import { migrationStatements, SCHEMA_VERSION } from "./schema.ts";
+import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
+import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+import { readMigrationFiles } from "drizzle-orm/migrator";
+import * as schema from "./db/schema.ts";
 
 export type SQLiteDB = Database;
+export type DrizzleDB = BunSQLiteDatabase<typeof schema>;
+
+const MIGRATIONS_FOLDER = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../drizzle"
+);
 
 export function openDb(dbPath: string): SQLiteDB {
   const db = new Database(dbPath);
@@ -12,12 +23,43 @@ export function openDb(dbPath: string): SQLiteDB {
   return db;
 }
 
+export function getDrizzle(db: SQLiteDB): DrizzleDB {
+  return drizzle(db, { schema });
+}
+
 export function runMigrations(db: SQLiteDB): void {
+  baselineIfNeeded(db);
+  const drizzleDb = drizzle(db);
+  migrate(drizzleDb, { migrationsFolder: MIGRATIONS_FOLDER });
+}
+
+function baselineIfNeeded(db: SQLiteDB): void {
+  const usersExists = db
+    .query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='users' LIMIT 1"
+    )
+    .get();
+  const drizzleMetaExists = db
+    .query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='__drizzle_migrations' LIMIT 1"
+    )
+    .get();
+  if (!usersExists || drizzleMetaExists) return;
+  const migrations = readMigrationFiles({ migrationsFolder: MIGRATIONS_FOLDER });
+  const first = migrations[0];
+  if (!first) return;
   const tx = db.transaction(() => {
-    migrationStatements.forEach((stmt) => db.exec(stmt));
-    db.query(
-      `INSERT INTO app_meta(key, value) VALUES('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`
-    ).run(String(SCHEMA_VERSION));
+    db.exec(
+      `CREATE TABLE IF NOT EXISTS __drizzle_migrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hash TEXT NOT NULL,
+        created_at NUMERIC
+      )`
+    );
+    const insert = db.query(
+      `INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)`
+    );
+    insert.run(first.hash, Date.now());
   });
   tx();
 }

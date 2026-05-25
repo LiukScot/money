@@ -1,7 +1,17 @@
 import cookie from "cookie";
 import bcrypt from "bcryptjs";
 import * as XLSX from "xlsx";
-import type { SQLiteDB } from "./db.ts";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { getDrizzle, type SQLiteDB } from "./db.ts";
+import {
+  users,
+  transactions,
+  monthly_movements,
+  monthly_snapshots,
+  asset_styles,
+  user_preferences,
+  user_sessions
+} from "./db/schema.ts";
 import {
   loginSchema,
   changePasswordSchema,
@@ -67,6 +77,7 @@ function readCookie(req: Request, name: string): string | null {
 
 export function createApi(opts: ApiOptions) {
   const { db, env } = opts;
+  const dbo = getDrizzle(db);
   const allowedOrigins = new Set(
     env.ALLOWED_ORIGINS.split(",")
       .map((v) => v.trim())
@@ -95,12 +106,19 @@ export function createApi(opts: ApiOptions) {
     const sid = readCookie(req, env.SESSION_COOKIE_NAME);
     if (!sid) return null;
     const now = Math.floor(Date.now() / 1000);
-    const row = db
-      .query(`SELECT user_id, email, expires_at FROM user_sessions WHERE sid = ? LIMIT 1`)
-      .get(sid) as { user_id: number; email: string; expires_at: number } | null;
+    const row = dbo
+      .select({
+        user_id: user_sessions.user_id,
+        email: user_sessions.email,
+        expires_at: user_sessions.expires_at
+      })
+      .from(user_sessions)
+      .where(eq(user_sessions.sid, sid))
+      .limit(1)
+      .get();
     if (!row) return null;
     if (Number(row.expires_at) <= now) {
-      db.query(`DELETE FROM user_sessions WHERE sid = ?`).run(sid);
+      dbo.delete(user_sessions).where(eq(user_sessions.sid, sid)).run();
       return null;
     }
     return { sid, userId: Number(row.user_id), email: row.email };
@@ -109,14 +127,15 @@ export function createApi(opts: ApiOptions) {
   async function createSession(userId: number, email: string): Promise<string> {
     const sid = crypto.randomUUID().replaceAll("-", "");
     const expiresAt = Math.floor(Date.now() / 1000) + env.SESSION_TTL_SECONDS;
-    db.query(
-      `INSERT INTO user_sessions (sid, user_id, email, expires_at) VALUES (?, ?, ?, ?)`
-    ).run(sid, userId, email, expiresAt);
+    dbo
+      .insert(user_sessions)
+      .values({ sid, user_id: userId, email, expires_at: expiresAt })
+      .run();
     return sid;
   }
 
   async function deleteSession(sid: string): Promise<void> {
-    db.query(`DELETE FROM user_sessions WHERE sid = ?`).run(sid);
+    dbo.delete(user_sessions).where(eq(user_sessions.sid, sid)).run();
   }
 
   function buildSessionCookie(sid: string): string {
@@ -155,9 +174,18 @@ export function createApi(opts: ApiOptions) {
 
     if (pathname === "/api/v1/auth/login" && method === "POST") {
       const body = await parseJson(req, loginSchema);
-      const user = db
-        .query(`SELECT id, email, password_hash, name, disabled_at FROM users WHERE email = ? LIMIT 1`)
-        .get(body.email) as UserRow | null;
+      const user = dbo
+        .select({
+          id: users.id,
+          email: users.email,
+          password_hash: users.password_hash,
+          name: users.name,
+          disabled_at: users.disabled_at
+        })
+        .from(users)
+        .where(eq(users.email, body.email))
+        .limit(1)
+        .get() as UserRow | undefined;
       if (!user) {
         return makeError("INVALID_CREDENTIALS", "Invalid credentials", 401, undefined, corsHeaders);
       }
@@ -170,10 +198,11 @@ export function createApi(opts: ApiOptions) {
         return makeError("INVALID_CREDENTIALS", "Invalid credentials", 401, undefined, corsHeaders);
       }
       if (check.rehash) {
-        db.query(`UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(
-          check.rehash,
-          user.id
-        );
+        dbo
+          .update(users)
+          .set({ password_hash: check.rehash, updated_at: sql`CURRENT_TIMESTAMP` })
+          .where(eq(users.id, user.id))
+          .run();
       }
 
       const sid = await createSession(user.id, user.email);
@@ -193,9 +222,18 @@ export function createApi(opts: ApiOptions) {
     if (pathname === "/api/v1/auth/session" && method === "GET") {
       const session = await getSession(req);
       if (!session) return makeData({ authenticated: false }, 200, corsHeaders);
-      const user = db
-        .query(`SELECT id, email, name, disabled_at FROM users WHERE id = ? LIMIT 1`)
-        .get(session.userId) as UserRow | null;
+      const user = dbo
+        .select({
+          id: users.id,
+          email: users.email,
+          password_hash: users.password_hash,
+          name: users.name,
+          disabled_at: users.disabled_at
+        })
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1)
+        .get() as UserRow | undefined;
       if (!user || user.disabled_at) return makeData({ authenticated: false }, 200, corsHeaders);
       return makeData(
         { authenticated: true, user: { id: user.id, email: user.email, name: user.name ?? null } },
@@ -208,9 +246,18 @@ export function createApi(opts: ApiOptions) {
     if (!session) {
       return makeError("UNAUTHORIZED", "Authentication required", 401, undefined, corsHeaders);
     }
-    const me = db
-      .query(`SELECT id, email, name, disabled_at FROM users WHERE id = ? LIMIT 1`)
-      .get(session.userId) as UserRow | null;
+    const me = dbo
+      .select({
+        id: users.id,
+        email: users.email,
+        password_hash: users.password_hash,
+        name: users.name,
+        disabled_at: users.disabled_at
+      })
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1)
+      .get() as UserRow | undefined;
     if (!me || me.disabled_at) {
       return makeError("UNAUTHORIZED", "Authentication required", 401, undefined, corsHeaders);
     }
@@ -218,9 +265,12 @@ export function createApi(opts: ApiOptions) {
 
     if (pathname === "/api/v1/auth/change-password" && method === "POST") {
       const body = await parseJson(req, changePasswordSchema);
-      const row = db
-        .query(`SELECT password_hash FROM users WHERE id = ? LIMIT 1`)
-        .get(userId) as { password_hash: string } | null;
+      const row = dbo
+        .select({ password_hash: users.password_hash })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1)
+        .get();
       if (!row) return makeError("UNAUTHORIZED", "Authentication required", 401, undefined, corsHeaders);
       const current = await verifyPassword(body.currentPassword, row.password_hash);
       if (!current.ok) {
@@ -233,10 +283,11 @@ export function createApi(opts: ApiOptions) {
         );
       }
       const newHash = await Bun.password.hash(body.newPassword, { algorithm: "argon2id" });
-      db.query(`UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(
-        newHash,
-        userId
-      );
+      dbo
+        .update(users)
+        .set({ password_hash: newHash, updated_at: sql`CURRENT_TIMESTAMP` })
+        .where(eq(users.id, userId))
+        .run();
       await deleteSession(session.sid);
       const sid = await createSession(userId, me.email);
       const headers = new Headers(corsHeaders);
@@ -245,9 +296,12 @@ export function createApi(opts: ApiOptions) {
     }
 
     if (pathname === "/api/v1/transactions" && method === "GET") {
-      const rows = db
-        .query(`SELECT * FROM transactions WHERE user_id = ? ORDER BY tx_date DESC, id DESC`)
-        .all(userId) as Parameters<typeof normalizeTx>[0][];
+      const rows = dbo
+        .select()
+        .from(transactions)
+        .where(eq(transactions.user_id, userId))
+        .orderBy(desc(transactions.tx_date), desc(transactions.id))
+        .all() as Parameters<typeof normalizeTx>[0][];
       return makeData(rows.map(normalizeTx), 200, corsHeaders);
     }
 
@@ -256,21 +310,21 @@ export function createApi(opts: ApiOptions) {
       const id = makeId("tx");
       const derivedType = body.derivedType || inferType(body.tipo, body.buyValue, body.pnl);
       const currentValue = Number.isFinite(body.currentValue) ? Number(body.currentValue) : body.buyValue + body.pnl;
-      db.query(
-        `INSERT INTO transactions (id, user_id, tx_date, asset, tipo, derived_type, buy_value, pnl, current_value, note)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        id,
-        userId,
-        body.txDate,
-        body.asset,
-        body.tipo,
-        derivedType,
-        body.buyValue,
-        body.pnl,
-        currentValue,
-        body.note ?? ""
-      );
+      dbo
+        .insert(transactions)
+        .values({
+          id,
+          user_id: userId,
+          tx_date: body.txDate,
+          asset: body.asset,
+          tipo: body.tipo,
+          derived_type: derivedType,
+          buy_value: body.buyValue,
+          pnl: body.pnl,
+          current_value: currentValue,
+          note: body.note ?? ""
+        })
+        .run();
       return makeData({ id }, 201, corsHeaders);
     }
 
@@ -280,48 +334,61 @@ export function createApi(opts: ApiOptions) {
       const body = await parseJson(req, txSchema);
       const derivedType = body.derivedType || inferType(body.tipo, body.buyValue, body.pnl);
       const currentValue = Number.isFinite(body.currentValue) ? Number(body.currentValue) : body.buyValue + body.pnl;
-      const result = db
-        .query(
-          `UPDATE transactions SET tx_date=?, asset=?, tipo=?, derived_type=?, buy_value=?, pnl=?, current_value=?, note=?, updated_at=CURRENT_TIMESTAMP
-           WHERE id=? AND user_id=?`
-        )
-        .run(
-          body.txDate,
-          body.asset,
-          body.tipo,
-          derivedType,
-          body.buyValue,
-          body.pnl,
-          currentValue,
-          body.note ?? "",
-          id,
-          userId
-        );
-      if (!result.changes) return makeError("NOT_FOUND", "Transaction not found", 404, undefined, corsHeaders);
+      const result = dbo
+        .update(transactions)
+        .set({
+          tx_date: body.txDate,
+          asset: body.asset,
+          tipo: body.tipo,
+          derived_type: derivedType,
+          buy_value: body.buyValue,
+          pnl: body.pnl,
+          current_value: currentValue,
+          note: body.note ?? "",
+          updated_at: sql`CURRENT_TIMESTAMP`
+        })
+        .where(and(eq(transactions.id, id), eq(transactions.user_id, userId)))
+        .returning({ id: transactions.id })
+        .all();
+      if (result.length === 0) return makeError("NOT_FOUND", "Transaction not found", 404, undefined, corsHeaders);
       return makeData({ ok: true }, 200, corsHeaders);
     }
 
     if (txMatch && method === "DELETE") {
       const id = txMatch[1] ?? "";
-      const result = db.query(`DELETE FROM transactions WHERE id = ? AND user_id = ?`).run(id, userId);
-      if (!result.changes) return makeError("NOT_FOUND", "Transaction not found", 404, undefined, corsHeaders);
+      const result = dbo
+        .delete(transactions)
+        .where(and(eq(transactions.id, id), eq(transactions.user_id, userId)))
+        .returning({ id: transactions.id })
+        .all();
+      if (result.length === 0) return makeError("NOT_FOUND", "Transaction not found", 404, undefined, corsHeaders);
       return makeData({ ok: true }, 200, corsHeaders);
     }
 
     if (pathname === "/api/v1/monthly-movements" && method === "GET") {
-      const rows = db
-        .query(`SELECT * FROM monthly_movements WHERE user_id = ? ORDER BY name ASC, id DESC`)
-        .all(userId) as Parameters<typeof normalizeMm>[0][];
+      const rows = dbo
+        .select()
+        .from(monthly_movements)
+        .where(eq(monthly_movements.user_id, userId))
+        .orderBy(monthly_movements.name, desc(monthly_movements.id))
+        .all() as Parameters<typeof normalizeMm>[0][];
       return makeData(rows.map(normalizeMm), 200, corsHeaders);
     }
 
     if (pathname === "/api/v1/monthly-movements" && method === "POST") {
       const body = await parseJson(req, movementSchema);
       const id = makeId("mm");
-      db.query(
-        `INSERT INTO monthly_movements (id, user_id, name, direction, amount, note)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      ).run(id, userId, body.name, body.direction, body.amount, body.note ?? "");
+      dbo
+        .insert(monthly_movements)
+        .values({
+          id,
+          user_id: userId,
+          name: body.name,
+          direction: body.direction,
+          amount: body.amount,
+          note: body.note ?? ""
+        })
+        .run();
       return makeData({ id }, 201, corsHeaders);
     }
 
@@ -329,38 +396,60 @@ export function createApi(opts: ApiOptions) {
     if (mmMatch && method === "PUT") {
       const id = mmMatch[1] ?? "";
       const body = await parseJson(req, movementSchema);
-      const result = db
-        .query(
-          `UPDATE monthly_movements SET name=?, direction=?, amount=?, note=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?`
-        )
-        .run(body.name, body.direction, body.amount, body.note ?? "", id, userId);
-      if (!result.changes)
+      const result = dbo
+        .update(monthly_movements)
+        .set({
+          name: body.name,
+          direction: body.direction,
+          amount: body.amount,
+          note: body.note ?? "",
+          updated_at: sql`CURRENT_TIMESTAMP`
+        })
+        .where(and(eq(monthly_movements.id, id), eq(monthly_movements.user_id, userId)))
+        .returning({ id: monthly_movements.id })
+        .all();
+      if (result.length === 0)
         return makeError("NOT_FOUND", "Monthly movement not found", 404, undefined, corsHeaders);
       return makeData({ ok: true }, 200, corsHeaders);
     }
 
     if (mmMatch && method === "DELETE") {
       const id = mmMatch[1] ?? "";
-      const result = db.query(`DELETE FROM monthly_movements WHERE id=? AND user_id=?`).run(id, userId);
-      if (!result.changes)
+      const result = dbo
+        .delete(monthly_movements)
+        .where(and(eq(monthly_movements.id, id), eq(monthly_movements.user_id, userId)))
+        .returning({ id: monthly_movements.id })
+        .all();
+      if (result.length === 0)
         return makeError("NOT_FOUND", "Monthly movement not found", 404, undefined, corsHeaders);
       return makeData({ ok: true }, 200, corsHeaders);
     }
 
     if (pathname === "/api/v1/monthly-snapshots" && method === "GET") {
-      const rows = db
-        .query(`SELECT * FROM monthly_snapshots WHERE user_id = ? ORDER BY snapshot_date DESC, id DESC`)
-        .all(userId) as Parameters<typeof normalizeSnap>[0][];
+      const rows = dbo
+        .select()
+        .from(monthly_snapshots)
+        .where(eq(monthly_snapshots.user_id, userId))
+        .orderBy(desc(monthly_snapshots.snapshot_date), desc(monthly_snapshots.id))
+        .all() as Parameters<typeof normalizeSnap>[0][];
       return makeData(rows.map(normalizeSnap), 200, corsHeaders);
     }
 
     if (pathname === "/api/v1/monthly-snapshots" && method === "POST") {
       const body = await parseJson(req, snapshotSchema);
       const id = makeId("snap");
-      db.query(
-        `INSERT INTO monthly_snapshots (id, user_id, snapshot_date, low_risk, medium_risk, high_risk, liquid)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).run(id, userId, body.snapshotDate, body.lowRisk, body.mediumRisk, body.highRisk, body.liquid);
+      dbo
+        .insert(monthly_snapshots)
+        .values({
+          id,
+          user_id: userId,
+          snapshot_date: body.snapshotDate,
+          low_risk: body.lowRisk,
+          medium_risk: body.mediumRisk,
+          high_risk: body.highRisk,
+          liquid: body.liquid
+        })
+        .run();
       return makeData({ id }, 201, corsHeaders);
     }
 
@@ -368,29 +457,46 @@ export function createApi(opts: ApiOptions) {
     if (snapMatch && method === "PUT") {
       const id = snapMatch[1] ?? "";
       const body = await parseJson(req, snapshotSchema);
-      const result = db
-        .query(
-          `UPDATE monthly_snapshots SET snapshot_date=?, low_risk=?, medium_risk=?, high_risk=?, liquid=?, updated_at=CURRENT_TIMESTAMP
-           WHERE id=? AND user_id=?`
-        )
-        .run(body.snapshotDate, body.lowRisk, body.mediumRisk, body.highRisk, body.liquid, id, userId);
-      if (!result.changes)
+      const result = dbo
+        .update(monthly_snapshots)
+        .set({
+          snapshot_date: body.snapshotDate,
+          low_risk: body.lowRisk,
+          medium_risk: body.mediumRisk,
+          high_risk: body.highRisk,
+          liquid: body.liquid,
+          updated_at: sql`CURRENT_TIMESTAMP`
+        })
+        .where(and(eq(monthly_snapshots.id, id), eq(monthly_snapshots.user_id, userId)))
+        .returning({ id: monthly_snapshots.id })
+        .all();
+      if (result.length === 0)
         return makeError("NOT_FOUND", "Monthly snapshot not found", 404, undefined, corsHeaders);
       return makeData({ ok: true }, 200, corsHeaders);
     }
 
     if (snapMatch && method === "DELETE") {
       const id = snapMatch[1] ?? "";
-      const result = db.query(`DELETE FROM monthly_snapshots WHERE id=? AND user_id=?`).run(id, userId);
-      if (!result.changes)
+      const result = dbo
+        .delete(monthly_snapshots)
+        .where(and(eq(monthly_snapshots.id, id), eq(monthly_snapshots.user_id, userId)))
+        .returning({ id: monthly_snapshots.id })
+        .all();
+      if (result.length === 0)
         return makeError("NOT_FOUND", "Monthly snapshot not found", 404, undefined, corsHeaders);
       return makeData({ ok: true }, 200, corsHeaders);
     }
 
     if (pathname === "/api/v1/assets/styles" && method === "GET") {
-      const rows = db
-        .query(`SELECT asset, color_hex, risk_level FROM asset_styles WHERE user_id = ?`)
-        .all(userId) as { asset: string; color_hex: string | null; risk_level: string | null }[];
+      const rows = dbo
+        .select({
+          asset: asset_styles.asset,
+          color_hex: asset_styles.color_hex,
+          risk_level: asset_styles.risk_level
+        })
+        .from(asset_styles)
+        .where(eq(asset_styles.user_id, userId))
+        .all();
       const styles: Record<string, { colorHex: string | null; riskLevel: string | null }> = {};
       rows.forEach((row) => {
         styles[row.asset] = { colorHex: row.color_hex ?? null, riskLevel: row.risk_level ?? null };
@@ -401,24 +507,34 @@ export function createApi(opts: ApiOptions) {
     if (pathname === "/api/v1/assets/styles" && method === "PUT") {
       const body = await parseJson(req, stylesSchema);
       const tx = db.transaction(() => {
-        db.query(`DELETE FROM asset_styles WHERE user_id = ?`).run(userId);
-        const insert = db.query(
-          `INSERT INTO asset_styles (user_id, asset, color_hex, risk_level, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`
-        );
+        dbo.delete(asset_styles).where(eq(asset_styles.user_id, userId)).run();
         for (const [asset, style] of Object.entries(body.styles)) {
           if (!asset.trim()) continue;
-          insert.run(userId, asset.trim(), style.colorHex ?? null, style.riskLevel ?? null);
+          dbo
+            .insert(asset_styles)
+            .values({
+              user_id: userId,
+              asset: asset.trim(),
+              color_hex: style.colorHex ?? null,
+              risk_level: style.riskLevel ?? null
+            })
+            .run();
         }
-        insert.finalize();
       });
       tx();
       return makeData({ ok: true }, 200, corsHeaders);
     }
 
     if (pathname === "/api/v1/preferences" && method === "GET") {
-      const row = db
-        .query(`SELECT show_zero_assets, updated_at FROM user_preferences WHERE user_id = ? LIMIT 1`)
-        .get(userId) as { show_zero_assets: number; updated_at: string } | null;
+      const row = dbo
+        .select({
+          show_zero_assets: user_preferences.show_zero_assets,
+          updated_at: user_preferences.updated_at
+        })
+        .from(user_preferences)
+        .where(eq(user_preferences.user_id, userId))
+        .limit(1)
+        .get();
       return makeData(
         { showZeroAssets: Boolean(row?.show_zero_assets ?? 0), updatedAt: row?.updated_at ?? null },
         200,
@@ -428,11 +544,20 @@ export function createApi(opts: ApiOptions) {
 
     if (pathname === "/api/v1/preferences" && method === "PUT") {
       const body = await parseJson(req, prefsSchema);
-      db.query(
-        `INSERT INTO user_preferences (user_id, show_zero_assets, updated_at)
-         VALUES (?, ?, CURRENT_TIMESTAMP)
-         ON CONFLICT(user_id) DO UPDATE SET show_zero_assets=excluded.show_zero_assets, updated_at=CURRENT_TIMESTAMP`
-      ).run(userId, body.showZeroAssets ? 1 : 0);
+      dbo
+        .insert(user_preferences)
+        .values({
+          user_id: userId,
+          show_zero_assets: body.showZeroAssets ? 1 : 0
+        })
+        .onConflictDoUpdate({
+          target: user_preferences.user_id,
+          set: {
+            show_zero_assets: body.showZeroAssets ? 1 : 0,
+            updated_at: sql`CURRENT_TIMESTAMP`
+          }
+        })
+        .run();
       return makeData({ ok: true }, 200, corsHeaders);
     }
 
@@ -612,21 +737,39 @@ export function createApi(opts: ApiOptions) {
   }
 
   function buildBackupPayload(userId: number) {
-    const txRows = db
-      .query(`SELECT * FROM transactions WHERE user_id = ? ORDER BY tx_date DESC, id DESC`)
-      .all(userId) as Parameters<typeof normalizeTx>[0][];
-    const mmRows = db
-      .query(`SELECT * FROM monthly_movements WHERE user_id = ? ORDER BY name ASC, id DESC`)
-      .all(userId) as Parameters<typeof normalizeMm>[0][];
-    const snapRows = db
-      .query(`SELECT * FROM monthly_snapshots WHERE user_id = ? ORDER BY snapshot_date DESC, id DESC`)
-      .all(userId) as Parameters<typeof normalizeSnap>[0][];
-    const styleRows = db
-      .query(`SELECT asset, color_hex, risk_level FROM asset_styles WHERE user_id = ?`)
-      .all(userId) as { asset: string; color_hex: string | null; risk_level: string | null }[];
-    const prefRow = db
-      .query(`SELECT show_zero_assets FROM user_preferences WHERE user_id = ? LIMIT 1`)
-      .get(userId) as { show_zero_assets: number } | null;
+    const txRows = dbo
+      .select()
+      .from(transactions)
+      .where(eq(transactions.user_id, userId))
+      .orderBy(desc(transactions.tx_date), desc(transactions.id))
+      .all() as Parameters<typeof normalizeTx>[0][];
+    const mmRows = dbo
+      .select()
+      .from(monthly_movements)
+      .where(eq(monthly_movements.user_id, userId))
+      .orderBy(monthly_movements.name, desc(monthly_movements.id))
+      .all() as Parameters<typeof normalizeMm>[0][];
+    const snapRows = dbo
+      .select()
+      .from(monthly_snapshots)
+      .where(eq(monthly_snapshots.user_id, userId))
+      .orderBy(desc(monthly_snapshots.snapshot_date), desc(monthly_snapshots.id))
+      .all() as Parameters<typeof normalizeSnap>[0][];
+    const styleRows = dbo
+      .select({
+        asset: asset_styles.asset,
+        color_hex: asset_styles.color_hex,
+        risk_level: asset_styles.risk_level
+      })
+      .from(asset_styles)
+      .where(eq(asset_styles.user_id, userId))
+      .all();
+    const prefRow = dbo
+      .select({ show_zero_assets: user_preferences.show_zero_assets })
+      .from(user_preferences)
+      .where(eq(user_preferences.user_id, userId))
+      .limit(1)
+      .get();
 
     const assetColors: Record<string, string> = {};
     const assetRisks: Record<string, string> = {};
@@ -671,11 +814,11 @@ export function createApi(opts: ApiOptions) {
   }
 
   function wipeUserData(userId: number, includeStyles: boolean, includePrefs: boolean): void {
-    db.query(`DELETE FROM transactions WHERE user_id = ?`).run(userId);
-    db.query(`DELETE FROM monthly_movements WHERE user_id = ?`).run(userId);
-    db.query(`DELETE FROM monthly_snapshots WHERE user_id = ?`).run(userId);
-    if (includeStyles) db.query(`DELETE FROM asset_styles WHERE user_id = ?`).run(userId);
-    if (includePrefs) db.query(`DELETE FROM user_preferences WHERE user_id = ?`).run(userId);
+    dbo.delete(transactions).where(eq(transactions.user_id, userId)).run();
+    dbo.delete(monthly_movements).where(eq(monthly_movements.user_id, userId)).run();
+    dbo.delete(monthly_snapshots).where(eq(monthly_snapshots.user_id, userId)).run();
+    if (includeStyles) dbo.delete(asset_styles).where(eq(asset_styles.user_id, userId)).run();
+    if (includePrefs) dbo.delete(user_preferences).where(eq(user_preferences.user_id, userId)).run();
   }
 
   type ImportPayload = {
@@ -690,10 +833,6 @@ export function createApi(opts: ApiOptions) {
   };
 
   function applyImport(userId: number, payload: ImportPayload): void {
-    const insertTx = db.query(
-      `INSERT OR IGNORE INTO transactions (id, user_id, tx_date, asset, tipo, derived_type, buy_value, pnl, current_value, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
     payload.transactions.forEach((row) => {
       const id = String(row.id ?? makeId("tx"));
       const txDate = String(row.date ?? row.txDate ?? "").slice(0, 10);
@@ -706,68 +845,83 @@ export function createApi(opts: ApiOptions) {
         : buyValue + pnl;
       const derivedType = String(row.derivedType ?? row.type ?? inferType(tipo, buyValue, pnl));
       const note = String(row.note ?? "");
-      insertTx.run(id, userId, txDate, asset, tipo, derivedType, buyValue, pnl, currentValue, note);
+      dbo
+        .insert(transactions)
+        .values({
+          id,
+          user_id: userId,
+          tx_date: txDate,
+          asset,
+          tipo,
+          derived_type: derivedType,
+          buy_value: buyValue,
+          pnl,
+          current_value: currentValue,
+          note
+        })
+        .onConflictDoNothing()
+        .run();
     });
-    insertTx.finalize();
 
-    const insertMm = db.query(
-      `INSERT OR IGNORE INTO monthly_movements (id, user_id, name, direction, amount, note) VALUES (?, ?, ?, ?, ?, ?)`
-    );
     const validDirections = new Set(["income", "expense"]);
     payload.monthlyMovements.forEach((row) => {
       const direction = validDirections.has(String(row.direction)) ? String(row.direction) : "income";
-      insertMm.run(
-        String(row.id ?? makeId("mm")),
-        userId,
-        String(row.name ?? ""),
-        direction,
-        Math.abs(Number(row.amount ?? 0)),
-        String(row.note ?? "")
-      );
+      dbo
+        .insert(monthly_movements)
+        .values({
+          id: String(row.id ?? makeId("mm")),
+          user_id: userId,
+          name: String(row.name ?? ""),
+          direction,
+          amount: Math.abs(Number(row.amount ?? 0)),
+          note: String(row.note ?? "")
+        })
+        .onConflictDoNothing()
+        .run();
     });
-    insertMm.finalize();
 
-    const insertSnap = db.query(
-      `INSERT OR IGNORE INTO monthly_snapshots (id, user_id, snapshot_date, low_risk, medium_risk, high_risk, liquid)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    );
     payload.monthlySnapshots.forEach((row) => {
-      insertSnap.run(
-        String(row.id ?? makeId("snap")),
-        userId,
-        String(row.date ?? row.snapshotDate ?? "").slice(0, 10),
-        Number(row.low ?? row.lowRisk ?? 0),
-        Number(row.medium ?? row.mediumRisk ?? 0),
-        Number(row.high ?? row.highRisk ?? 0),
-        Number(row.liquid ?? 0)
-      );
+      dbo
+        .insert(monthly_snapshots)
+        .values({
+          id: String(row.id ?? makeId("snap")),
+          user_id: userId,
+          snapshot_date: String(row.date ?? row.snapshotDate ?? "").slice(0, 10),
+          low_risk: Number(row.low ?? row.lowRisk ?? 0),
+          medium_risk: Number(row.medium ?? row.mediumRisk ?? 0),
+          high_risk: Number(row.high ?? row.highRisk ?? 0),
+          liquid: Number(row.liquid ?? 0)
+        })
+        .onConflictDoNothing()
+        .run();
     });
-    insertSnap.finalize();
 
     if (payload.replaceStyles) {
-      const insertStyle = db.query(
-        `INSERT INTO asset_styles (user_id, asset, color_hex, risk_level, updated_at)
-         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`
-      );
       const assets = new Set<string>([
         ...Object.keys(payload.assetColors),
         ...Object.keys(payload.assetRisks)
       ]);
       assets.forEach((asset) =>
-        insertStyle.run(
-          userId,
-          asset,
-          payload.assetColors[asset] ?? null,
-          payload.assetRisks[asset] ?? null
-        )
+        dbo
+          .insert(asset_styles)
+          .values({
+            user_id: userId,
+            asset,
+            color_hex: payload.assetColors[asset] ?? null,
+            risk_level: payload.assetRisks[asset] ?? null
+          })
+          .run()
       );
-      insertStyle.finalize();
     }
 
     if (payload.replacePrefs) {
-      db.query(
-        `INSERT INTO user_preferences (user_id, show_zero_assets, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`
-      ).run(userId, payload.preferences.showZeroAssets ? 1 : 0);
+      dbo
+        .insert(user_preferences)
+        .values({
+          user_id: userId,
+          show_zero_assets: payload.preferences.showZeroAssets ? 1 : 0
+        })
+        .run();
     }
   }
 

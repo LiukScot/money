@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { openDb, runMigrations } from "./db.ts";
+import { lte } from "drizzle-orm";
+import { getDrizzle, openDb, runMigrations } from "./db.ts";
+import { user_sessions } from "./db/schema.ts";
 import { createApi } from "./app.ts";
 import { makeError, setSecurityHeaders } from "./helpers.ts";
 
@@ -23,7 +25,10 @@ const env = envSchema.parse(process.env);
 fs.mkdirSync(path.dirname(env.DB_PATH), { recursive: true });
 const db = openDb(env.DB_PATH);
 runMigrations(db);
-db.query(`DELETE FROM user_sessions WHERE expires_at <= ?`).run(Math.floor(Date.now() / 1000));
+getDrizzle(db)
+  .delete(user_sessions)
+  .where(lte(user_sessions.expires_at, Math.floor(Date.now() / 1000)))
+  .run();
 
 const api = createApi({ db, env });
 

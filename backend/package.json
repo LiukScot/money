@@ -12,6 +12,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cookie": "^1.1.1",
+    "drizzle-orm": "^0.45.2",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
@@ -20,6 +21,7 @@
     "@types/bun": "^1.3.14",
     "@types/cookie": "^1.0.0",
     "@types/node": "^25.9.1",
+    "drizzle-kit": "^0.31.10",
     "typescript": "^6.0.3"
   }
 }

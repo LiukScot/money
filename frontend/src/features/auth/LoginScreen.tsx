@@ -35,7 +35,7 @@ export function LoginScreen() {
             </Button>
             {loginMutation.error && (
               <Alert variant="destructive">
-                <AlertDescription>{String((loginMutation.error as Error).message)}</AlertDescription>
+                <AlertDescription>{loginMutation.error instanceof Error ? loginMutation.error.message : String(loginMutation.error)}</AlertDescription>
               </Alert>
             )}
             <p className="text-sm text-muted-foreground">Signup is disabled. Use CLI provisioning.</p>

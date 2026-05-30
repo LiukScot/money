@@ -35,7 +35,12 @@ backupRoutes.post("/json/import", validateJson(backupImportSchema), (c) => {
       replacePrefs: true
     });
   });
-  tx();
+  try {
+    tx();
+  } catch (e) {
+    console.error("[backup] json import failed:", e);
+    return jsonError(c, "IMPORT_FAILED", "Import failed. Check server logs for details.", 500);
+  }
   return jsonData(c, { ok: true });
 });
 
@@ -153,7 +158,10 @@ backupRoutes.post("/xlsx/import", async (c) => {
       return jsonError(c, "INVALID_FILE", "Could not parse file as XLSX", 400);
     }
   } else {
-    const payload = (await c.req.json().catch(() => null)) as { base64?: string } | null;
+    const payload = (await c.req.json().catch((e: unknown) => {
+      console.error("[backup] json parse failed:", e);
+      return null;
+    })) as { base64?: string } | null;
     if (!payload?.base64 || typeof payload.base64 !== "string") {
       return jsonError(
         c,
@@ -223,7 +231,12 @@ backupRoutes.post("/xlsx/import", async (c) => {
       replacePrefs: hasPrefSheet
     });
   });
-  tx();
+  try {
+    tx();
+  } catch (e) {
+    console.error("[backup] xlsx import failed:", e);
+    return jsonError(c, "IMPORT_FAILED", "Import failed. Check server logs for details.", 500);
+  }
   return jsonData(c, {
     ok: true,
     imported: {

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { apiEnvelopeSchema, apiFetch } from "@/lib";
-import { txSchema, type StylesMap } from "@/types";
+import { stylesResponse, txSchema } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthlyRiskChart } from "./MonthlyRiskChart";
 import { SnapshotForm } from "./SnapshotForm";
@@ -11,10 +11,6 @@ import { useSnapshotsQuery } from "./useSnapshotsQuery";
 import { useSnapMutation } from "./useSnapMutation";
 import { useDeleteSnapshot } from "./useDeleteSnapshot";
 import { type SnapFormValues } from "./schemas";
-
-const stylesShape = apiEnvelopeSchema(
-  z.record(z.string(), z.object({ colorHex: z.string().nullable(), riskLevel: z.string().nullable() }))
-);
 
 const snapDefaults: SnapFormValues = {
   snapshotDate: new Date().toISOString().slice(0, 10),
@@ -37,7 +33,7 @@ export function SnapshotsPanel() {
   const stylesQuery = useQuery({
     queryKey: ["styles"],
     queryFn: async () =>
-      apiFetch("/api/v1/assets/styles", { method: "GET" }, (raw) => stylesShape.parse(raw).data as StylesMap)
+      apiFetch("/api/v1/assets/styles", { method: "GET" }, (raw) => stylesResponse.parse(raw).data)
   });
 
   const form = useForm<SnapFormValues>({

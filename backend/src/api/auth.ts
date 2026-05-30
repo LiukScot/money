@@ -80,11 +80,15 @@ authRoutes.post("/login", async (c, next) => {
     return jsonError(c, "INVALID_CREDENTIALS", "Invalid credentials", 401);
   }
   if (check.rehash) {
-    dbo
-      .update(users)
-      .set({ password_hash: check.rehash, updated_at: sql`CURRENT_TIMESTAMP` })
-      .where(eq(users.id, user.id))
-      .run();
+    try {
+      dbo
+        .update(users)
+        .set({ password_hash: check.rehash, updated_at: sql`CURRENT_TIMESTAMP` })
+        .where(eq(users.id, user.id))
+        .run();
+    } catch (e) {
+      console.error("[auth] rehash write failed (login still succeeds):", e);
+    }
   }
   const { sid } = createSession(db, user.id, user.email, env.SESSION_TTL_SECONDS);
   setSessionCookie(c, env, sid);
@@ -139,6 +143,14 @@ authRoutes.get("/session", (c) => {
 
 authRoutes.post(
   "/change-password",
+  async (c, next) => {
+    const decision = c.get("loginRateLimiter").check(clientIp(c));
+    if (!decision.allowed) {
+      c.header("retry-after", String(decision.retryAfterSeconds));
+      return jsonError(c, "RATE_LIMITED", "Too many attempts. Try again later.", 429);
+    }
+    return next();
+  },
   sessionGuard,
   validateJson(changePasswordSchema),
   async (c) => {

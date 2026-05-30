@@ -1,11 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { apiEnvelopeSchema, apiFetch } from "@/lib";
-import type { StylesMap } from "@/types";
-
-const stylesShape = apiEnvelopeSchema(
-  z.record(z.string(), z.object({ colorHex: z.string().nullable(), riskLevel: z.string().nullable() }))
-);
+import { stylesResponse, type StylesMap } from "@/types";
 
 const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
 
@@ -14,7 +10,7 @@ export function useStylesQuery(enabled: boolean) {
     queryKey: ["styles"],
     enabled,
     queryFn: async () =>
-      apiFetch("/api/v1/assets/styles", { method: "GET" }, (raw) => stylesShape.parse(raw).data as StylesMap)
+      apiFetch("/api/v1/assets/styles", { method: "GET" }, (raw) => stylesResponse.parse(raw).data)
   });
 }
 

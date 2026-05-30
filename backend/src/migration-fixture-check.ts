@@ -102,7 +102,7 @@ assert(report.monthlySnapshots === 1, "Expected 1 monthly snapshot");
 assert(report.assetStyles === 2, "Expected 2 asset styles");
 
 const target = new Database(targetPath, { readonly: true });
-const count = (table: string) => Number((target.query(`SELECT COUNT(*) as c FROM ${table}`).get() as any)?.c ?? 0);
+const count = (table: string) => Number((target.query(`SELECT COUNT(*) as c FROM ${table}`).get() as { c: number } | undefined)?.c ?? 0);
 assert(count("users") === 2, "Target users count mismatch");
 assert(count("transactions") === 2, "Target transactions count mismatch");
 assert(count("monthly_movements") === 1, "Target monthly movements count mismatch");

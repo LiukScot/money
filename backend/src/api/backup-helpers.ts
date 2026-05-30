@@ -114,85 +114,69 @@ export function wipeUserData(
 
 export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload): void {
   const dbo = getDrizzle(db);
-  payload.transactions.forEach((row) => {
-    const id = String(row.id ?? makeId("tx"));
-    const txDate = String(row.date ?? row.txDate ?? "").slice(0, 10);
-    const asset = String(row.asset ?? "");
-    const tipo = String(row.tipo ?? "");
+
+  const txRows = payload.transactions.map((row) => {
+    const id = String(row.id ?? makeId("tx")).slice(0, 64);
     const buyValue = Number(row.buyValue ?? 0);
     const pnl = Number(row.pnl ?? 0);
-    const currentValue = Number.isFinite(Number(row.currentValue))
-      ? Number(row.currentValue)
-      : buyValue + pnl;
-    const derivedType = String(row.derivedType ?? row.type ?? inferType(tipo, buyValue, pnl));
-    const note = String(row.note ?? "");
-    dbo
-      .insert(transactions)
-      .values({
-        id,
-        user_id: userId,
-        tx_date: txDate,
-        asset,
-        tipo,
-        derived_type: derivedType,
-        buy_value: buyValue,
-        pnl,
-        current_value: currentValue,
-        note
-      })
-      .onConflictDoNothing()
-      .run();
+    const tipo = String(row.tipo ?? "");
+    return {
+      id,
+      user_id: userId,
+      tx_date: String(row.date ?? row.txDate ?? "").slice(0, 10),
+      asset: String(row.asset ?? ""),
+      tipo,
+      derived_type: String(row.derivedType ?? row.type ?? inferType(tipo, buyValue, pnl)),
+      buy_value: buyValue,
+      pnl,
+      current_value: Number.isFinite(Number(row.currentValue)) ? Number(row.currentValue) : buyValue + pnl,
+      note: String(row.note ?? "")
+    };
   });
+  if (txRows.length > 0) {
+    dbo.insert(transactions).values(txRows).onConflictDoNothing().run();
+  }
 
   const validDirections = new Set(["income", "expense"]);
-  payload.monthlyMovements.forEach((row) => {
-    const direction = validDirections.has(String(row.direction)) ? String(row.direction) : "income";
-    dbo
-      .insert(monthly_movements)
-      .values({
-        id: String(row.id ?? makeId("mm")),
-        user_id: userId,
-        name: String(row.name ?? ""),
-        direction,
-        amount: Math.abs(Number(row.amount ?? 0)),
-        note: String(row.note ?? "")
-      })
-      .onConflictDoNothing()
-      .run();
-  });
+  const mmRows = payload.monthlyMovements.map((row) => ({
+    id: String(row.id ?? makeId("mm")).slice(0, 64),
+    user_id: userId,
+    name: String(row.name ?? ""),
+    direction: validDirections.has(String(row.direction)) ? String(row.direction) : "income",
+    amount: Math.abs(Number(row.amount ?? 0)),
+    note: String(row.note ?? "")
+  }));
+  if (mmRows.length > 0) {
+    dbo.insert(monthly_movements).values(mmRows).onConflictDoNothing().run();
+  }
 
-  payload.monthlySnapshots.forEach((row) => {
-    dbo
-      .insert(monthly_snapshots)
-      .values({
-        id: String(row.id ?? makeId("snap")),
-        user_id: userId,
-        snapshot_date: String(row.date ?? row.snapshotDate ?? "").slice(0, 10),
-        low_risk: Number(row.low ?? row.lowRisk ?? 0),
-        medium_risk: Number(row.medium ?? row.mediumRisk ?? 0),
-        high_risk: Number(row.high ?? row.highRisk ?? 0),
-        liquid: Number(row.liquid ?? 0)
-      })
-      .onConflictDoNothing()
-      .run();
-  });
+  const snapRows = payload.monthlySnapshots.map((row) => ({
+    id: String(row.id ?? makeId("snap")).slice(0, 64),
+    user_id: userId,
+    snapshot_date: String(row.date ?? row.snapshotDate ?? "").slice(0, 10),
+    low_risk: Number(row.low ?? row.lowRisk ?? 0),
+    medium_risk: Number(row.medium ?? row.mediumRisk ?? 0),
+    high_risk: Number(row.high ?? row.highRisk ?? 0),
+    liquid: Number(row.liquid ?? 0)
+  }));
+  if (snapRows.length > 0) {
+    dbo.insert(monthly_snapshots).values(snapRows).onConflictDoNothing().run();
+  }
 
   if (payload.replaceStyles) {
     const assets = new Set<string>([
       ...Object.keys(payload.assetColors),
       ...Object.keys(payload.assetRisks)
     ]);
-    assets.forEach((asset) =>
-      dbo
-        .insert(asset_styles)
-        .values({
-          user_id: userId,
-          asset,
-          color_hex: payload.assetColors[asset] ?? null,
-          risk_level: payload.assetRisks[asset] ?? null
-        })
-        .run()
-    );
+    const styleRows = Array.from(assets).map((asset) => ({
+      user_id: userId,
+      asset,
+      color_hex: payload.assetColors[asset] ?? null,
+      risk_level: payload.assetRisks[asset] ?? null
+    }));
+    if (styleRows.length > 0) {
+      dbo.insert(asset_styles).values(styleRows).onConflictDoNothing().run();
+    }
   }
 
   if (payload.replacePrefs) {

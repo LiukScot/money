@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   BarElement,
   CategoryScale,
@@ -19,6 +20,11 @@ function token(name: string, fallback: string): string {
 }
 
 export function MonthlyRiskChart({ snapshots }: { snapshots: Snapshot[] }) {
+  const colorLow = useMemo(() => token("--risk-low", "#34d399"), []);
+  const colorMedium = useMemo(() => token("--risk-medium", "#fbbf24"), []);
+  const colorHigh = useMemo(() => token("--risk-high", "#fb7185"), []);
+  const colorLiquid = useMemo(() => token("--risk-liquid", "#60a5fa"), []);
+
   if (snapshots.length === 0) {
     return (
       <p className="text-sm text-muted-foreground my-2" data-testid="snapshot-chart-empty">
@@ -30,10 +36,10 @@ export function MonthlyRiskChart({ snapshots }: { snapshots: Snapshot[] }) {
   const data = {
     labels: asc.map((s) => s.snapshotDate),
     datasets: [
-      { label: "Low", data: asc.map((s) => s.lowRisk), backgroundColor: token("--risk-low", "#34d399") },
-      { label: "Medium", data: asc.map((s) => s.mediumRisk), backgroundColor: token("--risk-medium", "#fbbf24") },
-      { label: "High", data: asc.map((s) => s.highRisk), backgroundColor: token("--risk-high", "#fb7185") },
-      { label: "Liquid", data: asc.map((s) => s.liquid), backgroundColor: token("--risk-liquid", "#60a5fa") }
+      { label: "Low", data: asc.map((s) => s.lowRisk), backgroundColor: colorLow },
+      { label: "Medium", data: asc.map((s) => s.mediumRisk), backgroundColor: colorMedium },
+      { label: "High", data: asc.map((s) => s.highRisk), backgroundColor: colorHigh },
+      { label: "Liquid", data: asc.map((s) => s.liquid), backgroundColor: colorLiquid }
     ]
   };
   const options = {

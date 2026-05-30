@@ -56,10 +56,10 @@ function baselineIfNeeded(db: SQLiteDB): void {
         created_at NUMERIC
       )`
     );
-    const insert = db.query(
-      `INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)`
-    );
-    insert.run(first.hash, Date.now());
+    db.run(`INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)`, [
+      first.hash,
+      Date.now()
+    ]);
   });
   tx();
 }

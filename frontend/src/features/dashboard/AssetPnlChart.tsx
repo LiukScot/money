@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   BarElement,
   CategoryScale,
@@ -19,6 +20,9 @@ function token(name: string, fallback: string): string {
 }
 
 export function AssetPnlChart({ visibleAssets }: { visibleAssets: AssetStats[] }) {
+  const colorPositive = useMemo(() => token("--risk-low", "#34d399"), []);
+  const colorNegative = useMemo(() => token("--risk-high", "#fb7185"), []);
+
   if (visibleAssets.length === 0) {
     return (
       <p className="text-sm text-muted-foreground my-2" data-testid="pnl-chart-empty">
@@ -27,8 +31,6 @@ export function AssetPnlChart({ visibleAssets }: { visibleAssets: AssetStats[] }
     );
   }
   const sorted = [...visibleAssets].sort((a, b) => b.pnl - a.pnl);
-  const colorPositive = token("--risk-low", "#34d399");
-  const colorNegative = token("--risk-high", "#fb7185");
   const data = {
     labels: sorted.map((s) => s.asset),
     datasets: [

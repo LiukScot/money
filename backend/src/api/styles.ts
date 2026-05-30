@@ -35,17 +35,16 @@ stylesRoutes.put("/", validateJson(stylesSchema), (c) => {
   const dbo = getDrizzle(db);
   const tx = db.transaction(() => {
     dbo.delete(asset_styles).where(eq(asset_styles.user_id, user.id)).run();
-    for (const [asset, style] of Object.entries(body.styles)) {
-      if (!asset.trim()) continue;
-      dbo
-        .insert(asset_styles)
-        .values({
-          user_id: user.id,
-          asset: asset.trim(),
-          color_hex: style.colorHex ?? null,
-          risk_level: style.riskLevel ?? null
-        })
-        .run();
+    const rows = Object.entries(body.styles)
+      .filter(([asset]) => asset.trim())
+      .map(([asset, style]) => ({
+        user_id: user.id,
+        asset: asset.trim(),
+        color_hex: style.colorHex ?? null,
+        risk_level: style.riskLevel ?? null
+      }));
+    if (rows.length > 0) {
+      dbo.insert(asset_styles).values(rows).run();
     }
   });
   tx();

@@ -62,9 +62,9 @@ export const stylesSchema = z.object({
 export const prefsSchema = z.object({ showZeroAssets: z.boolean() });
 
 export const backupImportSchema = z.object({
-  transactions: z.array(z.record(z.string(), z.any())).optional(),
-  monthlyMovements: z.array(z.record(z.string(), z.any())).optional(),
-  monthlySnapshots: z.array(z.record(z.string(), z.any())).optional(),
+  transactions: z.array(z.record(z.string(), z.any())).max(50_000).optional(),
+  monthlyMovements: z.array(z.record(z.string(), z.any())).max(50_000).optional(),
+  monthlySnapshots: z.array(z.record(z.string(), z.any())).max(50_000).optional(),
   assetColors: z.record(z.string(), z.string()).optional(),
   assetRisks: z.record(z.string(), z.string()).optional(),
   preferences: z.record(z.string(), z.any()).optional()

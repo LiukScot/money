@@ -11,13 +11,13 @@ const envSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
   PORT: z.coerce.number().default(8001),
   DB_PATH: z.string().default(path.resolve(process.cwd(), "../data/mymoney.sqlite")),
-  SESSION_TTL_SECONDS: z.coerce.number().default(60 * 60 * 24 * 30),
+  SESSION_TTL_SECONDS: z.coerce.number().default(60 * 60 * 24 * 30), // 30 days
   SESSION_COOKIE_NAME: z.string().default("MYMONEY_SESSID"),
   ALLOWED_ORIGINS: z
     .string()
     .default("http://localhost:5174,http://127.0.0.1:5174,http://localhost:8001,http://127.0.0.1:8001"),
   PUBLIC_DIR: z.string().default(path.resolve(process.cwd(), "../frontend/dist")),
-  COOKIE_SECURE: z.string().default("false"),
+  COOKIE_SECURE: z.string().default("true"),
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().default(5),
   LOGIN_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().default(15 * 60)
 });
@@ -64,14 +64,10 @@ const server = Bun.serve({
       );
     }
 
-    if (
-      url.pathname === "/hub" ||
-      url.pathname.startsWith("/hub/") ||
-      url.pathname === "/myhealth" ||
-      url.pathname.startsWith("/myhealth/") ||
-      url.pathname === "/mymoney" ||
-      url.pathname.startsWith("/mymoney/")
-    ) {
+    // Routes reserved for sibling apps in the same reverse-proxy namespace.
+    // Return 404 JSON instead of falling through to the SPA index.
+    const SIBLING_APP_PREFIXES = ["/hub", "/myhealth", "/mymoney"];
+    if (SIBLING_APP_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(`${p}/`))) {
       const headers = new Headers({ "content-type": "application/json" });
       applySecurityHeaders(headers);
       return new Response(

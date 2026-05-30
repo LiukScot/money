@@ -40,8 +40,8 @@ export function AssetBlocks({ visibleAssets, stylesMap, onChangeStyle }: Props) 
   return (
     <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] mt-3">
       {visibleAssets.map((stat) => {
+        const currentRisk = stat.riskLevel;
         const styleEntry = stylesMap?.[stat.asset];
-        const currentRisk = (stat.riskLevel ?? (styleEntry?.riskLevel as RiskLevel | null) ?? null) as RiskLevel | null;
         const colorValue = styleEntry?.colorHex ?? stat.color;
         const pnlClass = stat.pnl >= 0 ? "text-emerald-400" : "text-rose-400";
         const pnlDir = stat.pnl >= 0 ? "up" : "down";

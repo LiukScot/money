@@ -84,7 +84,7 @@ describe("GET /api/v1/monthly-movements pagination", () => {
         id: `mm-${String(i).padStart(4, "0")}`,
         user_id: user.id,
         name: `m-${i}`,
-        direction: "in",
+        direction: "income",
         amount: i,
         note: null
       }).run();

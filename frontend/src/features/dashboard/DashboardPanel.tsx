@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEnvelopeSchema, apiFetch } from "../../lib";
 import { z } from "zod";
@@ -121,21 +121,21 @@ export function DashboardPanel() {
     };
   }, [transactions, movements]);
 
-  const handleStyleChange = (
-    asset: string,
-    patch: { colorHex?: string | null; riskLevel?: RiskLevel | null }
-  ) => {
-    const latest = queryClient.getQueryData<StylesMap>(["styles"]) ?? stylesMap;
-    const current = latest[asset] ?? { colorHex: null, riskLevel: null };
-    const next: StylesMap = {
-      ...latest,
-      [asset]: {
-        colorHex: "colorHex" in patch ? (patch.colorHex ?? null) : current.colorHex,
-        riskLevel: "riskLevel" in patch ? (patch.riskLevel ?? null) : current.riskLevel
-      }
-    };
-    stylesMutation.mutate(next);
-  };
+  const handleStyleChange = useCallback(
+    (asset: string, patch: { colorHex?: string | null; riskLevel?: RiskLevel | null }) => {
+      const latest = queryClient.getQueryData<StylesMap>(["styles"]) ?? stylesMap;
+      const current = latest[asset] ?? { colorHex: null, riskLevel: null };
+      const next: StylesMap = {
+        ...latest,
+        [asset]: {
+          colorHex: "colorHex" in patch ? (patch.colorHex ?? null) : current.colorHex,
+          riskLevel: "riskLevel" in patch ? (patch.riskLevel ?? null) : current.riskLevel
+        }
+      };
+      stylesMutation.mutate(next);
+    },
+    [queryClient, stylesMap, stylesMutation]
+  );
 
   return (
     <Card>

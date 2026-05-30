@@ -1,11 +1,12 @@
-FROM oven/bun:1 AS frontend-build
+# renovate: datasource=docker depName=oven/bun
+FROM oven/bun:1.2 AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN bun install
 COPY frontend/ ./
 RUN bun run build
 
-FROM oven/bun:1
+FROM oven/bun:1.2
 WORKDIR /app
 
 COPY backend/package.json backend/bun.lock ./backend/

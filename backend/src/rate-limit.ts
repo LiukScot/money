@@ -43,6 +43,10 @@ export function createRateLimiter(maxAttempts: number, windowMs: number): RateLi
     check(key: string): RateLimitResult {
       if (disabled) return { allowed: true, retryAfterSeconds: 0 };
       const now = Date.now();
+      // Evict expired buckets on every check to bound Map growth under IP scanning.
+      for (const [k, b] of buckets) {
+        if (b.resetAt <= now) buckets.delete(k);
+      }
       const existing = buckets.get(key);
       if (!existing || existing.resetAt <= now) {
         buckets.set(key, { count: 1, resetAt: now + windowMs });

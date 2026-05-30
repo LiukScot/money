@@ -8,12 +8,10 @@ export const TIPO_OPTIONS = [
   "Variazione Valore"
 ] as const;
 
-const TIPO_PNL_ONLY = new Set<string>(["cedola", "interessi", "cashback", "Variazione Valore"]);
 const TIPO_BUY_ONLY = new Set<string>(["nuovo vincolo"]);
 
 export function tipoShowsBuyValue(tipo: string): boolean {
-  if (TIPO_PNL_ONLY.has(tipo)) return false;
-  return true;
+  return TIPO_BUY_ONLY.has(tipo);
 }
 
 export function tipoShowsPnl(tipo: string): boolean {

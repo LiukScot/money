@@ -1,10 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { apiEnvelopeSchema, apiFetch } from "@/lib";
+import { apiEnvelopeSchema, apiFetch, okSchema } from "@/lib";
 import { mmFormSchema, type MmFormValues } from "./schemas";
 
 const createSchema = apiEnvelopeSchema(z.object({ id: z.string() }));
-const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
 
 export function useMmMutation(editingId: string | null, onAfterSuccess: () => void) {
   const queryClient = useQueryClient();

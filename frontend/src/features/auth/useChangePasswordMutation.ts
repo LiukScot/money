@@ -1,10 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { z } from "zod";
-import { apiEnvelopeSchema, apiFetch } from "@/lib";
+import { apiFetch, okSchema } from "@/lib";
 import type { ChangePasswordValues } from "./schemas";
 
-const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
 
 export function useChangePasswordMutation(onAfterSuccess?: () => void) {
   return useMutation({

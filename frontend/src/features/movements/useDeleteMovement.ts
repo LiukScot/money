@@ -1,8 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
-import { apiEnvelopeSchema, apiFetch } from "@/lib";
+import { apiFetch, okSchema } from "@/lib";
 
-const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
 
 export function useDeleteMovement() {
   const queryClient = useQueryClient();

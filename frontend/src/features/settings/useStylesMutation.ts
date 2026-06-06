@@ -1,9 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
-import { apiEnvelopeSchema, apiFetch } from "@/lib";
+import { apiFetch, okSchema } from "@/lib";
 import { stylesResponse, type StylesMap } from "@/types";
 
-const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
 
 export function useStylesQuery(enabled: boolean) {
   return useQuery({

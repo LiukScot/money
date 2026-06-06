@@ -25,15 +25,15 @@ export function SnapshotsPanel() {
   // and so the Add button only enables once both are ready.
   const txQuery = useQuery({
     queryKey: ["transactions"],
-    queryFn: async () =>
-      apiFetch("/api/v1/transactions", { method: "GET" }, (raw) =>
+    queryFn: async ({ signal }) =>
+      apiFetch("/api/v1/transactions", { method: "GET", signal }, (raw) =>
         apiEnvelopeSchema(z.array(txSchema)).parse(raw).data
       )
   });
   const stylesQuery = useQuery({
     queryKey: ["styles"],
-    queryFn: async () =>
-      apiFetch("/api/v1/assets/styles", { method: "GET" }, (raw) => stylesResponse.parse(raw).data)
+    queryFn: async ({ signal }) =>
+      apiFetch("/api/v1/assets/styles", { method: "GET", signal }, (raw) => stylesResponse.parse(raw).data)
   });
 
   const form = useForm<SnapFormValues>({

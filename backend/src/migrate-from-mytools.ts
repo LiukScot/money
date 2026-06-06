@@ -44,8 +44,9 @@ function safeNum(value: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// reason: legacy JSON shape from external source DB is unknown at compile time
 function readSourceJson(db: Database, name: string): any | null {
-  const row = db.query(`SELECT data FROM files WHERE name = ? LIMIT 1`).get(name) as any;
+  const row = db.query(`SELECT data FROM files WHERE name = ? LIMIT 1`).get(name) as any; // reason: bun:sqlite raw query result has no type info
   if (!row?.data) return null;
   try {
     return JSON.parse(row.data);
@@ -72,7 +73,7 @@ function main() {
   runMigrations(target);
   const targetDbo = getDrizzle(target);
 
-  const sourceUsers = source.query(`SELECT id, email, password_hash, name, created_at, updated_at FROM users ORDER BY id ASC`).all() as any[];
+  const sourceUsers = source.query(`SELECT id, email, password_hash, name, created_at, updated_at FROM users ORDER BY id ASC`).all() as any[]; // reason: legacy source SQLite schema, fields accessed via String()/coercion below
   const primary = sourceUsers.find((u) => String(u.email).toLowerCase() === cfg.primaryEmail.toLowerCase());
   if (!primary) {
     throw new Error(`Primary email ${cfg.primaryEmail} not found in source users table.`);
@@ -128,7 +129,7 @@ function main() {
     targetDbo.delete(styleTbl).where(eq(styleTbl.user_id, primary.id)).run();
     targetDbo.delete(prefTbl).where(eq(prefTbl.user_id, primary.id)).run();
 
-    transactions.forEach((row: any, idx: number) => {
+    transactions.forEach((row: any, idx: number) => { // reason: legacy JSON shape, accessed via coercion
       const id = String(row.id ?? `tx-${idx}-${Date.now()}`);
       const date = String(row.date ?? "").slice(0, 10);
       const asset = String(row.asset ?? "");
@@ -155,7 +156,7 @@ function main() {
         .run();
     });
 
-    monthlyMovements.forEach((row: any, idx: number) => {
+    monthlyMovements.forEach((row: any, idx: number) => { // reason: legacy JSON shape, accessed via coercion
       const id = String(row.id ?? `mm-${idx}-${Date.now()}`);
       targetDbo
         .insert(mmTbl)
@@ -170,7 +171,7 @@ function main() {
         .run();
     });
 
-    monthlySnapshots.forEach((row: any, idx: number) => {
+    monthlySnapshots.forEach((row: any, idx: number) => { // reason: legacy JSON shape, accessed via coercion
       const id = String(row.id ?? `snap-${idx}-${Date.now()}`);
       targetDbo
         .insert(snapTbl)
@@ -189,7 +190,7 @@ function main() {
     const assets = new Set<string>([
       ...Object.keys(assetColors),
       ...Object.keys(assetRisks),
-      ...transactions.map((t: any) => String(t.asset ?? "")).filter(Boolean)
+      ...transactions.map((t: any) => String(t.asset ?? "")).filter(Boolean) // reason: legacy JSON shape
     ]);
 
     assets.forEach((asset) => {

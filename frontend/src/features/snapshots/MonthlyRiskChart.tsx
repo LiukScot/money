@@ -10,20 +10,15 @@ import {
 import { Bar } from "react-chartjs-2";
 import { formatCurrency } from "../../lib";
 import type { Snapshot } from "../../types";
+import { cssToken } from "../../lib/cssToken";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
-function token(name: string, fallback: string): string {
-  if (typeof document === "undefined") return fallback;
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value || fallback;
-}
-
 export function MonthlyRiskChart({ snapshots }: { snapshots: Snapshot[] }) {
-  const colorLow = useMemo(() => token("--risk-low", "#34d399"), []);
-  const colorMedium = useMemo(() => token("--risk-medium", "#fbbf24"), []);
-  const colorHigh = useMemo(() => token("--risk-high", "#fb7185"), []);
-  const colorLiquid = useMemo(() => token("--risk-liquid", "#60a5fa"), []);
+  const colorLow = useMemo(() => cssToken("--risk-low", "#34d399"), []);
+  const colorMedium = useMemo(() => cssToken("--risk-medium", "#fbbf24"), []);
+  const colorHigh = useMemo(() => cssToken("--risk-high", "#fb7185"), []);
+  const colorLiquid = useMemo(() => cssToken("--risk-liquid", "#60a5fa"), []);
 
   if (snapshots.length === 0) {
     return (

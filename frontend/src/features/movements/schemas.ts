@@ -3,7 +3,7 @@ import { z } from "zod";
 export const mmFormSchema = z.object({
   name: z.string().min(1),
   direction: z.enum(["income", "expense"]),
-  amount: z.coerce.number().nonnegative(),
+  amount: z.coerce.number().finite().nonnegative(),
   note: z.string().default("")
 });
 

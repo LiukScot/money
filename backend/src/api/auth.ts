@@ -90,6 +90,7 @@ authRoutes.post("/login", async (c, next) => {
       console.error("[auth] rehash write failed (login still succeeds):", e);
     }
   }
+  getDrizzle(db).delete(user_sessions).where(eq(user_sessions.user_id, user.id)).run();
   const { sid } = createSession(db, user.id, user.email, env.SESSION_TTL_SECONDS);
   setSessionCookie(c, env, sid);
   return jsonData(c, { email: user.email, name: user.name ?? null });

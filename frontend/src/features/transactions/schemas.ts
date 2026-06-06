@@ -23,8 +23,8 @@ export const txFormSchema = z.object({
   txDate: z.string().min(1),
   asset: z.string().min(1),
   tipo: z.string().min(1),
-  buyValue: z.coerce.number(),
-  pnl: z.coerce.number(),
+  buyValue: z.coerce.number().finite(),
+  pnl: z.coerce.number().finite(),
   note: z.string().default("")
 });
 

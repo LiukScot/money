@@ -112,27 +112,37 @@ export function wipeUserData(
   if (includePrefs) dbo.delete(user_preferences).where(eq(user_preferences.user_id, userId)).run();
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function toIsoDateOrNull(v: unknown): string | null {
+  const s = String(v ?? "").slice(0, 10);
+  return ISO_DATE_RE.test(s) && Number.isFinite(Date.parse(s)) ? s : null;
+}
+
 export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload): void {
   const dbo = getDrizzle(db);
 
-  const txRows = payload.transactions.map((row) => {
-    const id = String(row.id ?? makeId("tx")).slice(0, 64);
-    const buyValue = Number(row.buyValue ?? 0);
-    const pnl = Number(row.pnl ?? 0);
-    const tipo = String(row.tipo ?? "");
-    return {
-      id,
-      user_id: userId,
-      tx_date: String(row.date ?? row.txDate ?? "").slice(0, 10),
-      asset: String(row.asset ?? ""),
-      tipo,
-      derived_type: String(row.derivedType ?? row.type ?? inferType(tipo, buyValue, pnl)),
-      buy_value: buyValue,
-      pnl,
-      current_value: Number.isFinite(Number(row.currentValue)) ? Number(row.currentValue) : buyValue + pnl,
-      note: String(row.note ?? "")
-    };
-  });
+  const txRows = payload.transactions
+    .map((row) => {
+      const tx_date = toIsoDateOrNull(row.date ?? row.txDate);
+      if (!tx_date) return null;
+      const id = String(row.id ?? makeId("tx")).slice(0, 64);
+      const buyValue = Number.isFinite(Number(row.buyValue)) ? Number(row.buyValue) : 0;
+      const pnl = Number.isFinite(Number(row.pnl)) ? Number(row.pnl) : 0;
+      const tipo = String(row.tipo ?? "").slice(0, 60);
+      return {
+        id,
+        user_id: userId,
+        tx_date,
+        asset: String(row.asset ?? "").slice(0, 120),
+        tipo,
+        derived_type: String(row.derivedType ?? row.type ?? inferType(tipo, buyValue, pnl)),
+        buy_value: buyValue,
+        pnl,
+        current_value: Number.isFinite(Number(row.currentValue)) ? Number(row.currentValue) : buyValue + pnl,
+        note: String(row.note ?? "").slice(0, 2000)
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
   if (txRows.length > 0) {
     dbo.insert(transactions).values(txRows).onConflictDoNothing().run();
   }
@@ -141,24 +151,30 @@ export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload
   const mmRows = payload.monthlyMovements.map((row) => ({
     id: String(row.id ?? makeId("mm")).slice(0, 64),
     user_id: userId,
-    name: String(row.name ?? ""),
+    name: String(row.name ?? "").slice(0, 120),
     direction: validDirections.has(String(row.direction)) ? String(row.direction) : "income",
-    amount: Math.abs(Number(row.amount ?? 0)),
-    note: String(row.note ?? "")
+    amount: Math.abs(Number.isFinite(Number(row.amount)) ? Number(row.amount) : 0),
+    note: String(row.note ?? "").slice(0, 2000)
   }));
   if (mmRows.length > 0) {
     dbo.insert(monthly_movements).values(mmRows).onConflictDoNothing().run();
   }
 
-  const snapRows = payload.monthlySnapshots.map((row) => ({
-    id: String(row.id ?? makeId("snap")).slice(0, 64),
-    user_id: userId,
-    snapshot_date: String(row.date ?? row.snapshotDate ?? "").slice(0, 10),
-    low_risk: Number(row.low ?? row.lowRisk ?? 0),
-    medium_risk: Number(row.medium ?? row.mediumRisk ?? 0),
-    high_risk: Number(row.high ?? row.highRisk ?? 0),
-    liquid: Number(row.liquid ?? 0)
-  }));
+  const snapRows = payload.monthlySnapshots
+    .map((row) => {
+      const snapshot_date = toIsoDateOrNull(row.date ?? row.snapshotDate);
+      if (!snapshot_date) return null;
+      return {
+        id: String(row.id ?? makeId("snap")).slice(0, 64),
+        user_id: userId,
+        snapshot_date,
+        low_risk: Number.isFinite(Number(row.low ?? row.lowRisk)) ? Number(row.low ?? row.lowRisk) : 0,
+        medium_risk: Number.isFinite(Number(row.medium ?? row.mediumRisk)) ? Number(row.medium ?? row.mediumRisk) : 0,
+        high_risk: Number.isFinite(Number(row.high ?? row.highRisk)) ? Number(row.high ?? row.highRisk) : 0,
+        liquid: Number.isFinite(Number(row.liquid)) ? Number(row.liquid) : 0
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
   if (snapRows.length > 0) {
     dbo.insert(monthly_snapshots).values(snapRows).onConflictDoNothing().run();
   }
@@ -180,12 +196,11 @@ export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload
   }
 
   if (payload.replacePrefs) {
+    const showZero = payload.preferences.showZeroAssets ? 1 : 0;
     dbo
       .insert(user_preferences)
-      .values({
-        user_id: userId,
-        show_zero_assets: payload.preferences.showZeroAssets ? 1 : 0
-      })
+      .values({ user_id: userId, show_zero_assets: showZero })
+      .onConflictDoUpdate({ target: user_preferences.user_id, set: { show_zero_assets: showZero } })
       .run();
   }
 }

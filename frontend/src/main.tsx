@@ -6,7 +6,9 @@ import { router } from "./router";
 import { Toaster } from "@/components/ui/sonner";
 import "./styles.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: Infinity } }
+});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

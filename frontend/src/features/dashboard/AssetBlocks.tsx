@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 
-const DEFAULT_ASSET_COLOR = "#7ee8a5";
+const DEFAULT_ASSET_COLOR = "#5de2a5"; // matches FALLBACK_PALETTE[0] in lib/dashboard.ts
 
 type Props = {
   visibleAssets: AssetStats[];

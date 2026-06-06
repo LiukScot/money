@@ -22,7 +22,12 @@ export function originGuard(allowedOriginsCsv: string): MiddlewareHandler<AppEnv
   return async (c, next) => {
     const origin = c.req.header("origin");
     if (origin) {
-      const requestOrigin = new URL(c.req.url).origin;
+      let requestOrigin: string;
+      try {
+        requestOrigin = new URL(c.req.url).origin;
+      } catch {
+        return jsonError(c, "BAD_REQUEST", "Invalid request URL", 400);
+      }
       const isSameOrigin = origin === requestOrigin;
       if (!isSameOrigin && !allowedOrigins.has(origin)) {
         return jsonError(c, "ORIGIN_NOT_ALLOWED", `Origin ${origin} is not allowed`, 403);

@@ -10,18 +10,13 @@ import {
 import { Bar } from "react-chartjs-2";
 import type { AssetStats } from "../../lib/dashboard";
 import { formatCurrency } from "../../lib";
+import { cssToken } from "../../lib/cssToken";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
-function token(name: string, fallback: string): string {
-  if (typeof document === "undefined") return fallback;
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value || fallback;
-}
-
 export function AssetPnlChart({ visibleAssets }: { visibleAssets: AssetStats[] }) {
-  const colorPositive = useMemo(() => token("--risk-low", "#34d399"), []);
-  const colorNegative = useMemo(() => token("--risk-high", "#fb7185"), []);
+  const colorPositive = useMemo(() => cssToken("--risk-low", "#34d399"), []);
+  const colorNegative = useMemo(() => cssToken("--risk-high", "#fb7185"), []);
 
   if (visibleAssets.length === 0) {
     return (

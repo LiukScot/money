@@ -18,10 +18,14 @@ export function useLoginMutation(onAfterSuccess?: () => void) {
         (raw) => loginEnvelope.parse(raw).data
       ),
     onSuccess: async () => {
+      // staleTime: 0 overrides the global Infinity default — the session was
+      // cached as unauthenticated on the login screen, so without forcing a
+      // refetch fetchQuery would return that stale value after a fresh login.
       const session = await queryClient.fetchQuery({
         queryKey: ["session"],
         queryFn: async ({ signal }) =>
-          apiFetch("/api/v1/auth/session", { method: "GET", signal }, (raw) => sessionSchema.parse(raw).data)
+          apiFetch("/api/v1/auth/session", { method: "GET", signal }, (raw) => sessionSchema.parse(raw).data),
+        staleTime: 0
       });
       if (session.authenticated && session.user) {
         setUser(session.user);

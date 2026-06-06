@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { apiEnvelopeSchema, apiFetch } from "@/lib";
+import { apiEnvelopeSchema, apiFetch, okSchema } from "@/lib";
 
 function downloadBlob(blob: Blob, filename: string) {
   const a = document.createElement("a");
@@ -16,7 +16,6 @@ function dateStamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
 const anySchema = apiEnvelopeSchema(z.any());
 
 export function useBackupActions() {

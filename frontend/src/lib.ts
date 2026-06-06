@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const apiEnvelopeSchema = <T extends z.ZodTypeAny>(schema: T) => z.object({ data: schema });
 
+export const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit,

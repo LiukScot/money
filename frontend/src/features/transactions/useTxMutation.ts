@@ -1,10 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { apiEnvelopeSchema, apiFetch } from "@/lib";
+import { apiEnvelopeSchema, apiFetch, okSchema } from "@/lib";
 import { txFormSchema, tipoShowsBuyValue, tipoShowsPnl, type TxFormValues } from "./schemas";
 
 const createSchema = apiEnvelopeSchema(z.object({ id: z.string() }));
-const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
 
 function buildPayload(values: TxFormValues) {
   const parsed = txFormSchema.parse(values);

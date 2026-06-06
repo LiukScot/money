@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiEnvelopeSchema, apiFetch } from "../../lib";
-import { z } from "zod";
+import { apiFetch, okSchema } from "../../lib";
 import {
   mmListResponse,
   prefsResponse,
@@ -21,7 +20,6 @@ import { AssetPnlChart } from "./AssetPnlChart";
 import { ZeroAssetsToggle } from "./ZeroAssetsToggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
 
 export function DashboardPanel() {
   const queryClient = useQueryClient();

@@ -30,12 +30,18 @@ export const txFormSchema = z.object({
 
 export type TxFormValues = z.infer<typeof txFormSchema>;
 
-export const txFormDefaults: TxFormValues = {
+/** Default values for useForm. Number fields accept "" so the input renders
+ *  a placeholder; z.coerce.number maps "" → 0 when the form is submitted. */
+export type TxFormDefaults = Omit<TxFormValues, "buyValue" | "pnl"> & {
+  buyValue: number | "";
+  pnl: number | "";
+};
+
+export const txFormDefaults: TxFormDefaults = {
   txDate: new Date().toISOString().slice(0, 10),
   asset: "",
   tipo: "nuovo vincolo",
-  // empty string renders placeholder in number input; z.coerce.number maps "" → 0 at submit
-  buyValue: "" as unknown as number,
-  pnl: "" as unknown as number,
+  buyValue: "",
+  pnl: "",
   note: ""
 };

@@ -2,12 +2,12 @@ import { type UseFormReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/shared/ui/Field";
-import type { SnapFormValues } from "./schemas";
+import type { SnapFormDefaults } from "./schemas";
 
 type Props = {
-  form: UseFormReturn<SnapFormValues>;
+  form: UseFormReturn<SnapFormDefaults>;
   disabled: boolean;
-  onSubmit: (values: SnapFormValues) => void;
+  onSubmit: (values: SnapFormDefaults) => void;
 };
 
 export function SnapshotForm({ form, disabled, onSubmit }: Props) {

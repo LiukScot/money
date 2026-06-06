@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { apiEnvelopeSchema, apiFetch, okSchema } from "@/lib";
-import { txFormSchema, tipoShowsBuyValue, tipoShowsPnl, type TxFormValues } from "./schemas";
+import { txFormSchema, tipoShowsBuyValue, tipoShowsPnl, type TxFormDefaults } from "./schemas";
 
 const createSchema = apiEnvelopeSchema(z.object({ id: z.string() }));
 
-function buildPayload(values: TxFormValues) {
+function buildPayload(values: TxFormDefaults) {
   const parsed = txFormSchema.parse(values);
   const buyValue = tipoShowsBuyValue(parsed.tipo) ? Number(parsed.buyValue) : 0;
   const pnl = tipoShowsPnl(parsed.tipo) ? Number(parsed.pnl) : 0;
@@ -23,7 +23,7 @@ function buildPayload(values: TxFormValues) {
 export function useTxMutation(editingId: string | null, onAfterSuccess: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (values: TxFormValues) => {
+    mutationFn: async (values: TxFormDefaults) => {
       const payload = buildPayload(values);
       if (editingId) {
         return apiFetch(

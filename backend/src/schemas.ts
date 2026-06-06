@@ -61,13 +61,60 @@ export const stylesSchema = z.object({
 
 export const prefsSchema = z.object({ showZeroAssets: z.boolean() });
 
+// Sub-schemas reflect fields actually read by applyImport.
+// .passthrough() keeps unknown fields so older/newer backups still import.
+const txImportRow = z
+  .object({
+    id: z.unknown().optional(),
+    date: z.unknown().optional(),
+    txDate: z.unknown().optional(),
+    asset: z.unknown().optional(),
+    tipo: z.unknown().optional(),
+    derivedType: z.unknown().optional(),
+    type: z.unknown().optional(),
+    buyValue: z.unknown().optional(),
+    pnl: z.unknown().optional(),
+    currentValue: z.unknown().optional(),
+    note: z.unknown().optional()
+  })
+  .passthrough();
+
+const mmImportRow = z
+  .object({
+    id: z.unknown().optional(),
+    name: z.unknown().optional(),
+    direction: z.unknown().optional(),
+    amount: z.unknown().optional(),
+    note: z.unknown().optional()
+  })
+  .passthrough();
+
+const snapImportRow = z
+  .object({
+    id: z.unknown().optional(),
+    date: z.unknown().optional(),
+    snapshotDate: z.unknown().optional(),
+    low: z.unknown().optional(),
+    lowRisk: z.unknown().optional(),
+    medium: z.unknown().optional(),
+    mediumRisk: z.unknown().optional(),
+    high: z.unknown().optional(),
+    highRisk: z.unknown().optional(),
+    liquid: z.unknown().optional()
+  })
+  .passthrough();
+
+const prefsImportRow = z
+  .object({ showZeroAssets: z.unknown().optional() })
+  .passthrough();
+
 export const backupImportSchema = z.object({
-  transactions: z.array(z.record(z.string(), z.any())).max(50_000).optional(),
-  monthlyMovements: z.array(z.record(z.string(), z.any())).max(50_000).optional(),
-  monthlySnapshots: z.array(z.record(z.string(), z.any())).max(50_000).optional(),
+  transactions: z.array(txImportRow).max(50_000).optional(),
+  monthlyMovements: z.array(mmImportRow).max(50_000).optional(),
+  monthlySnapshots: z.array(snapImportRow).max(50_000).optional(),
   assetColors: z.record(z.string(), z.string()).optional(),
   assetRisks: z.record(z.string(), z.string()).optional(),
-  preferences: z.record(z.string(), z.any()).optional()
+  preferences: prefsImportRow.optional()
 });
 
 export type ApiEnv = {

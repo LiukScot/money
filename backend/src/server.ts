@@ -70,18 +70,6 @@ const server = Bun.serve({
       );
     }
 
-    // Routes reserved for sibling apps in the same reverse-proxy namespace.
-    // Return 404 JSON instead of falling through to the SPA index.
-    const SIBLING_APP_PREFIXES = ["/hub", "/myhealth", "/mymoney"];
-    if (SIBLING_APP_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(`${p}/`))) {
-      const headers = new Headers({ "content-type": "application/json" });
-      applySecurityHeaders(headers);
-      return new Response(
-        JSON.stringify({ error: { code: "NOT_FOUND", message: "Route not found" } }),
-        { status: 404, headers }
-      );
-    }
-
     const staticFile = resolveStaticFile(env.PUBLIC_DIR, url.pathname);
     if (staticFile) {
       const headers = new Headers();

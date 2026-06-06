@@ -6,13 +6,13 @@ import { TransactionsTable } from "./TransactionsTable";
 import { useTransactionsQuery } from "./useTransactionsQuery";
 import { useTxMutation } from "./useTxMutation";
 import { useDeleteTransaction } from "./useDeleteTransaction";
-import { txFormDefaults, type TxFormValues } from "./schemas";
+import { txFormDefaults, type TxFormDefaults } from "./schemas";
 
 export function TransactionsPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const txQuery = useTransactionsQuery(true);
 
-  const form = useForm<TxFormValues>({ defaultValues: txFormDefaults });
+  const form = useForm<TxFormDefaults>({ defaultValues: txFormDefaults });
 
   const txMutation = useTxMutation(editingId, () => {
     setEditingId(null);

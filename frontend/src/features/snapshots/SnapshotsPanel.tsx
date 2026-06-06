@@ -10,12 +10,11 @@ import { SnapshotsTable } from "./SnapshotsTable";
 import { useSnapshotsQuery } from "./useSnapshotsQuery";
 import { useSnapMutation } from "./useSnapMutation";
 import { useDeleteSnapshot } from "./useDeleteSnapshot";
-import { type SnapFormValues } from "./schemas";
+import { type SnapFormDefaults } from "./schemas";
 
-const snapDefaults: SnapFormValues = {
+const snapDefaults: SnapFormDefaults = {
   snapshotDate: new Date().toISOString().slice(0, 10),
-  // empty string renders placeholder in number input; z.coerce.number maps "" → 0 at submit
-  liquid: "" as unknown as number
+  liquid: ""
 };
 
 export function SnapshotsPanel() {
@@ -36,12 +35,12 @@ export function SnapshotsPanel() {
       apiFetch("/api/v1/assets/styles", { method: "GET", signal }, (raw) => stylesResponse.parse(raw).data)
   });
 
-  const form = useForm<SnapFormValues>({
+  const form = useForm<SnapFormDefaults>({
     defaultValues: { ...snapDefaults }
   });
 
   const snapMutation = useSnapMutation(() => {
-    form.reset({ snapshotDate: new Date().toISOString().slice(0, 10), liquid: "" as unknown as number });
+    form.reset({ snapshotDate: new Date().toISOString().slice(0, 10), liquid: "" });
   });
   const deleteMutation = useDeleteSnapshot();
 

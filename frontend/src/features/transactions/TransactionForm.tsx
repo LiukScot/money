@@ -15,15 +15,15 @@ import {
   TIPO_OPTIONS,
   tipoShowsBuyValue,
   tipoShowsPnl,
-  type TxFormValues
+  type TxFormDefaults
 } from "./schemas";
 
 type Props = {
-  form: UseFormReturn<TxFormValues>;
+  form: UseFormReturn<TxFormDefaults>;
   assetOptions: string[];
   editingId: string | null;
   isSubmitting: boolean;
-  onSubmit: (values: TxFormValues) => void;
+  onSubmit: (values: TxFormDefaults) => void;
   onCancel: () => void;
 };
 

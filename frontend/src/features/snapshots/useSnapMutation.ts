@@ -3,7 +3,7 @@ import { z } from "zod";
 import { apiEnvelopeSchema, apiFetch } from "@/lib";
 import type { StylesMap, Transaction } from "@/types";
 import { computePerAsset } from "@/lib/dashboard";
-import { snapFormSchema, type SnapFormValues } from "./schemas";
+import { snapFormSchema, type SnapFormDefaults } from "./schemas";
 
 const okSchema = apiEnvelopeSchema(z.object({ id: z.string() }));
 
@@ -19,7 +19,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export function useSnapMutation(onAfterSuccess: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (values: SnapFormValues) => {
+    mutationFn: async (values: SnapFormDefaults) => {
       const form = snapFormSchema.parse(values);
       const transactions = queryClient.getQueryData<Transaction[]>(["transactions"]);
       const stylesMap = queryClient.getQueryData<StylesMap>(["styles"]);

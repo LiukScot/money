@@ -1,13 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { apiEnvelopeSchema, apiFetch } from "@/lib";
-
-const prefsSchema = apiEnvelopeSchema(
-  z.object({
-    showZeroAssets: z.boolean(),
-    updatedAt: z.string().nullable().optional()
-  })
-);
+import { prefsResponse } from "@/types";
 
 const okSchema = apiEnvelopeSchema(z.object({ ok: z.boolean() }));
 
@@ -15,8 +9,8 @@ export function usePreferencesQuery(enabled: boolean) {
   return useQuery({
     queryKey: ["prefs"],
     enabled,
-    queryFn: async () =>
-      apiFetch("/api/v1/preferences", { method: "GET" }, (raw) => prefsSchema.parse(raw).data)
+    queryFn: async ({ signal }) =>
+      apiFetch("/api/v1/preferences", { method: "GET", signal }, (raw) => prefsResponse.parse(raw).data)
   });
 }
 

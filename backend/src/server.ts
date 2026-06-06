@@ -27,10 +27,16 @@ const env = envSchema.parse(process.env);
 fs.mkdirSync(path.dirname(env.DB_PATH), { recursive: true });
 const db = openDb(env.DB_PATH);
 runMigrations(db);
-getDrizzle(db)
-  .delete(user_sessions)
-  .where(lte(user_sessions.expires_at, Math.floor(Date.now() / 1000)))
-  .run();
+function sweepExpiredSessions() {
+  getDrizzle(db)
+    .delete(user_sessions)
+    .where(lte(user_sessions.expires_at, Math.floor(Date.now() / 1000)))
+    .run();
+}
+sweepExpiredSessions();
+const sessionCleanupInterval = setInterval(sweepExpiredSessions, 60 * 60 * 1000);
+process.once("SIGTERM", () => clearInterval(sessionCleanupInterval));
+process.once("SIGINT", () => clearInterval(sessionCleanupInterval));
 
 const api = createApi({ db, env });
 
@@ -80,6 +86,13 @@ const server = Bun.serve({
     if (staticFile) {
       const headers = new Headers();
       applySecurityHeaders(headers);
+      // Vite hashes all filenames under /assets/ — safe to cache indefinitely.
+      // Everything else (index.html) must revalidate on every request.
+      if (url.pathname.startsWith("/assets/")) {
+        headers.set("cache-control", "public, max-age=31536000, immutable");
+      } else {
+        headers.set("cache-control", "no-cache");
+      }
       return new Response(Bun.file(staticFile), { headers });
     }
 
@@ -87,6 +100,7 @@ const server = Bun.serve({
     if (fs.existsSync(indexFile)) {
       const headers = new Headers();
       applySecurityHeaders(headers);
+      headers.set("cache-control", "no-cache");
       return new Response(Bun.file(indexFile), { headers });
     }
 

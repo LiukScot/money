@@ -7,10 +7,10 @@ export function useMovementsQuery(enabled: boolean) {
   return useQuery({
     queryKey: ["movements"],
     enabled,
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       apiFetch(
         "/api/v1/monthly-movements",
-        { method: "GET" },
+        { method: "GET", signal },
         (raw) => apiEnvelopeSchema(z.array(mmSchema)).parse(raw).data
       )
   });

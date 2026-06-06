@@ -4,10 +4,12 @@ import { apiEnvelopeSchema, apiFetch } from "@/lib";
 
 function downloadBlob(blob: Blob, filename: string) {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  const objectUrl = URL.createObjectURL(blob);
+  a.href = objectUrl;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(a.href);
+  // Revoke after click is dispatched so the browser has time to start the download.
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 }
 
 function dateStamp(): string {
@@ -29,7 +31,12 @@ export function useBackupActions() {
   };
 
   const importJson = async (file: File) => {
-    const parsed = JSON.parse(await file.text());
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      throw new Error("File non valido: il file selezionato non è un JSON corretto.");
+    }
     await apiFetch(
       "/api/v1/backup/json/import",
       { method: "POST", body: JSON.stringify(parsed) },

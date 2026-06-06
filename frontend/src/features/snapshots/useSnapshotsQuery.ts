@@ -7,10 +7,10 @@ export function useSnapshotsQuery(enabled: boolean) {
   return useQuery({
     queryKey: ["snapshots"],
     enabled,
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       apiFetch(
         "/api/v1/monthly-snapshots",
-        { method: "GET" },
+        { method: "GET", signal },
         (raw) => apiEnvelopeSchema(z.array(snapSchema)).parse(raw).data
       )
   });

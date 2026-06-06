@@ -39,6 +39,7 @@ export function setSessionCookie(c: Context<AppEnv>, env: ApiEnv, sid: string): 
 export function clearSessionCookie(c: Context<AppEnv>, env: ApiEnv): void {
   deleteCookie(c, env.SESSION_COOKIE_NAME, {
     path: "/",
+    sameSite: "Strict",
     secure: env.COOKIE_SECURE.toLowerCase() === "true"
   });
 }

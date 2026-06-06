@@ -7,10 +7,10 @@ export function useTransactionsQuery(enabled: boolean) {
   return useQuery({
     queryKey: ["transactions"],
     enabled,
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       apiFetch(
         "/api/v1/transactions",
-        { method: "GET" },
+        { method: "GET", signal },
         (raw) => apiEnvelopeSchema(z.array(txSchema)).parse(raw).data
       )
   });

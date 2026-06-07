@@ -17,12 +17,22 @@ const envSchema = z.object({
     .string()
     .default("http://localhost:5174,http://127.0.0.1:5174,http://localhost:8001,http://127.0.0.1:8001"),
   PUBLIC_DIR: z.string().default(path.resolve(process.cwd(), "../frontend/dist")),
-  COOKIE_SECURE: z.string().default("true"),
+  // Default false so a plain-HTTP self-hosted LAN instance works out of the
+  // box. Internet-facing deployments must serve over HTTPS and set
+  // COOKIE_SECURE=true, otherwise the session cookie travels without the
+  // Secure flag and can be intercepted.
+  COOKIE_SECURE: z.string().default("false"),
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().default(5),
   LOGIN_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().default(15 * 60)
 });
 
 const env = envSchema.parse(process.env);
+
+if (env.COOKIE_SECURE.toLowerCase() !== "true") {
+  console.warn(
+    "⚠️  COOKIE_SECURE is disabled: session cookies are sent without the Secure flag. Use HTTPS and set COOKIE_SECURE=true for internet-facing deployments."
+  );
+}
 
 fs.mkdirSync(path.dirname(env.DB_PATH), { recursive: true });
 const db = openDb(env.DB_PATH);

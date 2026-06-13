@@ -4,12 +4,14 @@ import { eq } from "drizzle-orm";
 import { getDrizzle } from "../db.ts";
 import { users, user_sessions } from "../db/schema.ts";
 import { applySecurityHeaders } from "../security-headers.ts";
+import { nowUnixSeconds } from "../helpers.ts";
 import type { AppEnv } from "./types.ts";
 import { jsonError } from "./responses.ts";
 
 export const securityHeaders: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
-  applySecurityHeaders(c.res.headers);
+  const env = c.get("env");
+  applySecurityHeaders(c.res.headers, env.COOKIE_SECURE.toLowerCase() === "true");
 };
 
 export function originGuard(allowedOriginsCsv: string): MiddlewareHandler<AppEnv> {
@@ -60,14 +62,19 @@ export const sessionGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
     return jsonError(c, "UNAUTHORIZED", "Authentication required", 401);
   }
   const dbo = getDrizzle(db);
-  const now = Math.floor(Date.now() / 1000);
+  const now = nowUnixSeconds();
   const row = dbo
     .select({
-      user_id: user_sessions.user_id,
-      email: user_sessions.email,
-      expires_at: user_sessions.expires_at
+      userId: user_sessions.user_id,
+      sessionEmail: user_sessions.email,
+      expires_at: user_sessions.expires_at,
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      disabled_at: users.disabled_at
     })
     .from(user_sessions)
+    .innerJoin(users, eq(users.id, user_sessions.user_id))
     .where(eq(user_sessions.sid, sid))
     .limit(1)
     .get();
@@ -78,21 +85,10 @@ export const sessionGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
     dbo.delete(user_sessions).where(eq(user_sessions.sid, sid)).run();
     return jsonError(c, "UNAUTHORIZED", "Authentication required", 401);
   }
-  const me = dbo
-    .select({
-      id: users.id,
-      email: users.email,
-      name: users.name,
-      disabled_at: users.disabled_at
-    })
-    .from(users)
-    .where(eq(users.id, Number(row.user_id)))
-    .limit(1)
-    .get();
-  if (!me || me.disabled_at) {
+  if (row.disabled_at) {
     return jsonError(c, "UNAUTHORIZED", "Authentication required", 401);
   }
-  c.set("session", { sid, userId: Number(row.user_id), email: row.email });
-  c.set("user", { id: me.id, email: me.email, name: me.name ?? null });
+  c.set("session", { sid, userId: Number(row.userId), email: row.sessionEmail });
+  c.set("user", { id: row.id, email: row.email, name: row.name ?? null });
   await next();
 };

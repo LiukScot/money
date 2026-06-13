@@ -10,6 +10,8 @@ const FALLBACK_PALETTE = [
   "#9bd8ff"
 ];
 
+export const DEFAULT_COLOR = FALLBACK_PALETTE[0]!;
+
 export function fallbackColor(asset: string, index: number, styles: StylesMap | undefined): string {
   const fromStyle = styles?.[asset]?.colorHex;
   if (fromStyle) return fromStyle;

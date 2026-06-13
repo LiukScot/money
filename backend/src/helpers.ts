@@ -1,3 +1,7 @@
+export function nowUnixSeconds(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
 export function makeId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }

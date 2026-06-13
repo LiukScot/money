@@ -5,7 +5,7 @@ import { getDrizzle } from "../db.ts";
 import { asset_styles } from "../db/schema.ts";
 import { stylesSchema } from "../schemas.ts";
 import type { AppEnv } from "./types.ts";
-import { jsonData, validateJson } from "./responses.ts";
+import { jsonData, jsonError, validateJson } from "./responses.ts";
 
 export const stylesRoutes = new Hono<AppEnv>();
 
@@ -47,6 +47,11 @@ stylesRoutes.put("/", validateJson(stylesSchema), (c) => {
       dbo.insert(asset_styles).values(rows).run();
     }
   });
-  tx();
+  try {
+    tx();
+  } catch (e) {
+    console.error("[styles] put failed:", e);
+    return jsonError(c, "STYLES_SAVE_FAILED", "Failed to save styles. Check server logs.", 500);
+  }
   return jsonData(c, { ok: true });
 });

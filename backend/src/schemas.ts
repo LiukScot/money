@@ -3,7 +3,11 @@ import { z } from "zod";
 const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
-  .refine((v) => !isNaN(Date.parse(v)), "Invalid calendar date");
+  // Round-trip through Date to reject invalid calendar dates like "2023-02-30".
+  .refine((v) => {
+    const d = new Date(v);
+    return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+  }, "Invalid calendar date");
 
 export const loginSchema = z.object({
   email: z.string().email().max(254),
@@ -46,7 +50,7 @@ export const snapshotSchema = z.object({
 export const stylesSchema = z.object({
   styles: z
     .record(
-      z.string(),
+      z.string().min(1).max(120),
       z.object({
         colorHex: z
           .string()
@@ -112,8 +116,8 @@ export const backupImportSchema = z.object({
   transactions: z.array(txImportRow).max(50_000).optional(),
   monthlyMovements: z.array(mmImportRow).max(50_000).optional(),
   monthlySnapshots: z.array(snapImportRow).max(50_000).optional(),
-  assetColors: z.record(z.string(), z.string()).optional(),
-  assetRisks: z.record(z.string(), z.string()).optional(),
+  assetColors: z.record(z.string().min(1).max(120), z.string()).optional(),
+  assetRisks: z.record(z.string().min(1).max(120), z.string()).optional(),
   preferences: prefsImportRow.optional()
 });
 

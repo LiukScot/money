@@ -15,8 +15,7 @@ export function tipoShowsBuyValue(tipo: string): boolean {
 }
 
 export function tipoShowsPnl(tipo: string): boolean {
-  if (TIPO_BUY_ONLY.has(tipo)) return false;
-  return true;
+  return !tipoShowsBuyValue(tipo);
 }
 
 export const txFormSchema = z.object({

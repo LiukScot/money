@@ -115,7 +115,10 @@ export function wipeUserData(
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function toIsoDateOrNull(v: unknown): string | null {
   const s = String(v ?? "").slice(0, 10);
-  return ISO_DATE_RE.test(s) && Number.isFinite(Date.parse(s)) ? s : null;
+  // Round-trip through Date to reject invalid calendar dates (e.g. "2023-02-30").
+  if (!ISO_DATE_RE.test(s)) return null;
+  const d = new Date(s);
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s ? s : null;
 }
 
 export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload): void {
@@ -135,7 +138,7 @@ export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload
         tx_date,
         asset: String(row.asset ?? "").slice(0, 120),
         tipo,
-        derived_type: String(row.derivedType ?? row.type ?? inferType(tipo, buyValue, pnl)),
+        derived_type: String(row.derivedType ?? row.type ?? inferType(tipo, buyValue, pnl)).slice(0, 40),
         buy_value: buyValue,
         pnl,
         current_value: Number.isFinite(Number(row.currentValue)) ? Number(row.currentValue) : buyValue + pnl,
@@ -148,14 +151,21 @@ export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload
   }
 
   const validDirections = new Set(["income", "expense"]);
-  const mmRows = payload.monthlyMovements.map((row) => ({
-    id: String(row.id ?? makeId("mm")).slice(0, 64),
-    user_id: userId,
-    name: String(row.name ?? "").slice(0, 120),
-    direction: validDirections.has(String(row.direction)) ? String(row.direction) : "income",
-    amount: Math.abs(Number.isFinite(Number(row.amount)) ? Number(row.amount) : 0),
-    note: String(row.note ?? "").slice(0, 2000)
-  }));
+  const mmRows = payload.monthlyMovements
+    .map((row) => {
+      const direction = String(row.direction ?? "");
+      // Rows with unknown direction are skipped rather than silently reclassified.
+      if (!validDirections.has(direction)) return null;
+      return {
+        id: String(row.id ?? makeId("mm")).slice(0, 64),
+        user_id: userId,
+        name: String(row.name ?? "").slice(0, 120),
+        direction,
+        amount: Math.abs(Number.isFinite(Number(row.amount)) ? Number(row.amount) : 0),
+        note: String(row.note ?? "").slice(0, 2000)
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
   if (mmRows.length > 0) {
     dbo.insert(monthly_movements).values(mmRows).onConflictDoNothing().run();
   }
@@ -184,12 +194,15 @@ export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload
       ...Object.keys(payload.assetColors),
       ...Object.keys(payload.assetRisks)
     ]);
-    const styleRows = Array.from(assets).map((asset) => ({
-      user_id: userId,
-      asset,
-      color_hex: payload.assetColors[asset] ?? null,
-      risk_level: payload.assetRisks[asset] ?? null
-    }));
+    // Validate and truncate asset keys to match schema constraint (1-120 chars).
+    const styleRows = Array.from(assets)
+      .filter((asset) => asset.length >= 1 && asset.length <= 120)
+      .map((asset) => ({
+        user_id: userId,
+        asset,
+        color_hex: payload.assetColors[asset] ?? null,
+        risk_level: payload.assetRisks[asset] ?? null
+      }));
     if (styleRows.length > 0) {
       dbo.insert(asset_styles).values(styleRows).onConflictDoNothing().run();
     }

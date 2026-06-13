@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 
 import { eq, sql } from "drizzle-orm";
+import { nowUnixSeconds } from "../helpers.ts";
 import { getDrizzle } from "../db.ts";
 import { users, user_sessions } from "../db/schema.ts";
 import { changePasswordSchema, loginSchema } from "../schemas.ts";
@@ -111,34 +112,25 @@ authRoutes.get("/session", (c) => {
   const sid = getCookie(c, env.SESSION_COOKIE_NAME);
   if (!sid) return jsonData(c, { authenticated: false });
   const dbo = getDrizzle(db);
-  const now = Math.floor(Date.now() / 1000);
-  const sessionRow = dbo
+  const row = dbo
     .select({
-      user_id: user_sessions.user_id,
-      expires_at: user_sessions.expires_at
-    })
-    .from(user_sessions)
-    .where(eq(user_sessions.sid, sid))
-    .limit(1)
-    .get();
-  if (!sessionRow || Number(sessionRow.expires_at) <= now) {
-    return jsonData(c, { authenticated: false });
-  }
-  const user = dbo
-    .select({
+      expires_at: user_sessions.expires_at,
       id: users.id,
       email: users.email,
       name: users.name,
       disabled_at: users.disabled_at
     })
-    .from(users)
-    .where(eq(users.id, Number(sessionRow.user_id)))
+    .from(user_sessions)
+    .innerJoin(users, eq(users.id, user_sessions.user_id))
+    .where(eq(user_sessions.sid, sid))
     .limit(1)
     .get();
-  if (!user || user.disabled_at) return jsonData(c, { authenticated: false });
+  if (!row || Number(row.expires_at) <= nowUnixSeconds() || row.disabled_at) {
+    return jsonData(c, { authenticated: false });
+  }
   return jsonData(c, {
     authenticated: true,
-    user: { id: user.id, email: user.email, name: user.name ?? null }
+    user: { id: row.id, email: row.email, name: row.name ?? null }
   });
 });
 

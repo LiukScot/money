@@ -9,10 +9,13 @@ export const mmFormSchema = z.object({
 
 export type MmFormValues = z.infer<typeof mmFormSchema>;
 
-export const mmFormDefaults: MmFormValues = {
+/** Default values for useForm. Number field accepts "" so the input renders
+ *  a placeholder; z.coerce.number maps "" → 0 when the form is submitted. */
+export type MmFormDefaults = Omit<MmFormValues, "amount"> & { amount: number | "" };
+
+export const mmFormDefaults: MmFormDefaults = {
   name: "",
   direction: "income",
-  // empty string renders placeholder in number input; z.coerce.number maps "" → 0 at submit
-  amount: "" as unknown as number,
+  amount: "",
   note: ""
 };

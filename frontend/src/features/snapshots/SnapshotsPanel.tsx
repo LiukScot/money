@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { apiEnvelopeSchema, apiFetch } from "@/lib";
-import { stylesResponse, txSchema } from "@/types";
+import { apiFetch } from "@/lib";
+import { stylesResponse, txListResponse } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthlyRiskChart } from "./MonthlyRiskChart";
 import { SnapshotForm } from "./SnapshotForm";
@@ -26,7 +25,7 @@ export function SnapshotsPanel() {
     queryKey: ["transactions"],
     queryFn: async ({ signal }) =>
       apiFetch("/api/v1/transactions", { method: "GET", signal }, (raw) =>
-        apiEnvelopeSchema(z.array(txSchema)).parse(raw).data
+        txListResponse.parse(raw).data
       )
   });
   const stylesQuery = useQuery({

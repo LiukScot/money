@@ -194,12 +194,15 @@ export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload
       ...Object.keys(payload.assetColors),
       ...Object.keys(payload.assetRisks)
     ]);
-    const styleRows = Array.from(assets).map((asset) => ({
-      user_id: userId,
-      asset,
-      color_hex: payload.assetColors[asset] ?? null,
-      risk_level: payload.assetRisks[asset] ?? null
-    }));
+    // Validate and truncate asset keys to match schema constraint (1-120 chars).
+    const styleRows = Array.from(assets)
+      .filter((asset) => asset.length >= 1 && asset.length <= 120)
+      .map((asset) => ({
+        user_id: userId,
+        asset,
+        color_hex: payload.assetColors[asset] ?? null,
+        risk_level: payload.assetRisks[asset] ?? null
+      }));
     if (styleRows.length > 0) {
       dbo.insert(asset_styles).values(styleRows).onConflictDoNothing().run();
     }

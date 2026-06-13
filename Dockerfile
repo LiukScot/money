@@ -1,7 +1,7 @@
 # renovate: datasource=docker depName=oven/bun
 FROM oven/bun:1.3.14 AS frontend-build
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* frontend/bun.lock* ./
 RUN bun install --frozen-lockfile
 COPY frontend/ ./
 RUN bun run build

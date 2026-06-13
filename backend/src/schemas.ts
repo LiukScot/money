@@ -116,8 +116,8 @@ export const backupImportSchema = z.object({
   transactions: z.array(txImportRow).max(50_000).optional(),
   monthlyMovements: z.array(mmImportRow).max(50_000).optional(),
   monthlySnapshots: z.array(snapImportRow).max(50_000).optional(),
-  assetColors: z.record(z.string(), z.string()).optional(),
-  assetRisks: z.record(z.string(), z.string()).optional(),
+  assetColors: z.record(z.string().min(1).max(120), z.string()).optional(),
+  assetRisks: z.record(z.string().min(1).max(120), z.string()).optional(),
   preferences: prefsImportRow.optional()
 });
 

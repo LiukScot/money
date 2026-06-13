@@ -71,23 +71,25 @@ const server = Bun.serve({
       return api.fetch(req);
     }
 
+    const https = env.COOKIE_SECURE.toLowerCase() === "true";
     if (req.method !== "GET" && req.method !== "HEAD") {
       const headers = new Headers({ "content-type": "application/json" });
-      applySecurityHeaders(headers);
+      applySecurityHeaders(headers, https);
       return new Response(
         JSON.stringify({ error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed" } }),
         { status: 405, headers }
       );
     }
 
+    const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
     const staticFile = resolveStaticFile(env.PUBLIC_DIR, url.pathname);
     if (staticFile) {
       const headers = new Headers();
-      applySecurityHeaders(headers);
+      applySecurityHeaders(headers, https);
       // Vite hashes all filenames under /assets/ — safe to cache indefinitely.
       // Everything else (index.html) must revalidate on every request.
       if (url.pathname.startsWith("/assets/")) {
-        headers.set("cache-control", "public, max-age=31536000, immutable");
+        headers.set("cache-control", `public, max-age=${ONE_YEAR_SECONDS}, immutable`);
       } else {
         headers.set("cache-control", "no-cache");
       }
@@ -97,7 +99,7 @@ const server = Bun.serve({
     const indexFile = path.resolve(env.PUBLIC_DIR, "index.html");
     if (fs.existsSync(indexFile)) {
       const headers = new Headers();
-      applySecurityHeaders(headers);
+      applySecurityHeaders(headers, https);
       headers.set("cache-control", "no-cache");
       return new Response(Bun.file(indexFile), { headers });
     }

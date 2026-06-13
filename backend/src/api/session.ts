@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getDrizzle, type SQLiteDB } from "../db.ts";
 import { user_sessions } from "../db/schema.ts";
+import { nowUnixSeconds } from "../helpers.ts";
 import type { ApiEnv } from "../schemas.ts";
 import type { AppEnv } from "./types.ts";
 
@@ -14,7 +15,7 @@ export function createSession(
   ttlSeconds: number
 ): { sid: string; expiresAt: number } {
   const sid = crypto.randomUUID().replaceAll("-", "");
-  const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const expiresAt = nowUnixSeconds() + ttlSeconds;
   getDrizzle(db)
     .insert(user_sessions)
     .values({ sid, user_id: userId, email, expires_at: expiresAt })

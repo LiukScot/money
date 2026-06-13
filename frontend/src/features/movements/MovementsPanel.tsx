@@ -6,13 +6,13 @@ import { MovementsTable } from "./MovementsTable";
 import { useMovementsQuery } from "./useMovementsQuery";
 import { useMmMutation } from "./useMmMutation";
 import { useDeleteMovement } from "./useDeleteMovement";
-import { mmFormDefaults, type MmFormValues } from "./schemas";
+import { mmFormDefaults, mmFormSchema, type MmFormDefaults } from "./schemas";
 
 export function MovementsPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const mmQuery = useMovementsQuery(true);
 
-  const form = useForm<MmFormValues>({ defaultValues: mmFormDefaults });
+  const form = useForm<MmFormDefaults>({ defaultValues: mmFormDefaults });
 
   const mmMutation = useMmMutation(editingId, () => {
     setEditingId(null);
@@ -32,7 +32,7 @@ export function MovementsPanel() {
           isSubmitting={mmMutation.isPending}
           onSubmit={(values) => {
             if (mmMutation.isPending) return;
-            mmMutation.mutate(values);
+            mmMutation.mutate(mmFormSchema.parse(values));
           }}
           onCancel={() => {
             setEditingId(null);

@@ -16,6 +16,7 @@ function dateStamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// reason: backup payload is arbitrary JSON passed straight to JSON.stringify; shape is validated server-side
 const anySchema = apiEnvelopeSchema(z.any());
 
 export function useBackupActions() {

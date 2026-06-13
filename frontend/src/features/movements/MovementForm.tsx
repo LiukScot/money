@@ -10,13 +10,13 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Field } from "@/shared/ui/Field";
-import type { MmFormValues } from "./schemas";
+import type { MmFormDefaults } from "./schemas";
 
 type Props = {
-  form: UseFormReturn<MmFormValues>;
+  form: UseFormReturn<MmFormDefaults>;
   editingId: string | null;
   isSubmitting: boolean;
-  onSubmit: (values: MmFormValues) => void;
+  onSubmit: (values: MmFormDefaults) => void;
   onCancel: () => void;
 };
 

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { AssetStats } from "../../lib/dashboard";
-import { cycleRisk } from "../../lib/dashboard";
+import { cycleRisk, DEFAULT_COLOR } from "../../lib/dashboard";
 import { formatCurrency } from "../../lib";
 import type { RiskLevel, StylesMap } from "../../types";
 import { Card } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 
-const DEFAULT_ASSET_COLOR = "#5de2a5"; // matches FALLBACK_PALETTE[0] in lib/dashboard.ts
+const DEFAULT_ASSET_COLOR = DEFAULT_COLOR;
 
 type Props = {
   visibleAssets: AssetStats[];

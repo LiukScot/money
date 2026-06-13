@@ -158,10 +158,13 @@ backupRoutes.post("/xlsx/import", async (c) => {
       return jsonError(c, "INVALID_FILE", "Could not parse file as XLSX", 400);
     }
   } else {
-    const payload = (await c.req.json().catch((e: unknown) => {
+    let payload: { base64?: string } | null = null;
+    try {
+      payload = (await c.req.json()) as { base64?: string };
+    } catch (e: unknown) {
       console.error("[backup] json parse failed:", e);
-      return null;
-    })) as { base64?: string } | null;
+      return jsonError(c, "INVALID_JSON", "Request body is not valid JSON", 400);
+    }
     if (!payload?.base64 || typeof payload.base64 !== "string") {
       return jsonError(
         c,
@@ -255,6 +258,11 @@ purgeRoutes.post("/purge", (c) => {
   const tx = db.transaction(() => {
     wipeUserData(db, user.id, true, true);
   });
-  tx();
+  try {
+    tx();
+  } catch (e) {
+    console.error("[purge] failed:", e);
+    return jsonError(c, "PURGE_FAILED", "Purge failed. Check server logs for details.", 500);
+  }
   return jsonData(c, { ok: true });
 });

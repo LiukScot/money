@@ -34,9 +34,7 @@ export function AccountMenu() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-48">
-          <DropdownMenuItem
-            onSelect={() => setChangePasswordOpen((o) => !o)}
-          >
+          <DropdownMenuItem onSelect={() => setChangePasswordOpen(true)}>
             Change password
           </DropdownMenuItem>
           <DropdownMenuSeparator />

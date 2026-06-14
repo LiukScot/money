@@ -74,12 +74,18 @@ function promptHidden(label: string): Promise<string> {
         value += ch;
       }
     };
+    const onError = (err: Error) => {
+      cleanup();
+      reject(err);
+    };
     const cleanup = () => {
       stdin.setRawMode(false);
       stdin.pause();
       stdin.removeListener("data", onData);
+      stdin.removeListener("error", onError);
     };
     stdin.on("data", onData);
+    stdin.on("error", onError);
   });
 }
 

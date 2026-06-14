@@ -11,7 +11,7 @@ vi.mock("react-chartjs-2", () => ({
   Doughnut: () => null
 }));
 
-import { createAppRouter } from "./router.tsx";
+import { createAppRouter } from "./router-config.ts";
 import { resetTestState, testState } from "./test-msw.ts";
 
 function renderApp() {

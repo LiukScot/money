@@ -87,9 +87,9 @@ export function DashboardPanel() {
     }
   });
 
-  const transactions: Transaction[] = txQuery.data ?? [];
-  const movements: Movement[] = mmQuery.data ?? [];
-  const stylesMap: StylesMap = stylesQuery.data ?? {};
+  const transactions: Transaction[] = useMemo(() => txQuery.data ?? [], [txQuery.data]);
+  const movements: Movement[] = useMemo(() => mmQuery.data ?? [], [mmQuery.data]);
+  const stylesMap: StylesMap = useMemo(() => stylesQuery.data ?? {}, [stylesQuery.data]);
   const prefs: Preferences = prefsQuery.data ?? { showZeroAssets: false, updatedAt: null };
 
   const allStats = useMemo(() => computePerAsset(transactions, stylesMap), [transactions, stylesMap]);

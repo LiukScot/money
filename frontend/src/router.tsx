@@ -1,13 +1,10 @@
 import { lazy, Suspense } from "react";
-import {
-  createRootRoute,
-  createRoute,
-  createRouter,
-  Link,
-  Outlet,
-  redirect
-} from "@tanstack/react-router";
+import { Link, Outlet } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { AccountMenu } from "@/features/auth/AccountMenu";
+import { LoginScreen } from "@/features/auth/LoginScreen";
+import { useAuthStore } from "@/shared/auth/authStore";
+import { useSessionSync } from "@/shared/auth/useSessionSync";
 
 const RouterDevtools = import.meta.env.DEV
   ? lazy(() =>
@@ -16,15 +13,6 @@ const RouterDevtools = import.meta.env.DEV
       }))
     )
   : () => null;
-import { AccountMenu } from "@/features/auth/AccountMenu";
-import { LoginScreen } from "@/features/auth/LoginScreen";
-import { DashboardPanel } from "@/features/dashboard/DashboardPanel";
-import { MovementsPanel } from "@/features/movements/MovementsPanel";
-import { SettingsPanel } from "@/features/settings/SettingsPanel";
-import { SnapshotsPanel } from "@/features/snapshots/SnapshotsPanel";
-import { TransactionsPanel } from "@/features/transactions/TransactionsPanel";
-import { useAuthStore } from "@/shared/auth/authStore";
-import { useSessionSync } from "@/shared/auth/useSessionSync";
 
 const navItems = [
   { to: "/dashboard", label: "dashboard" },
@@ -50,7 +38,7 @@ function NavLink({ to, label }: { to: string; label: string }) {
   );
 }
 
-function RootShell() {
+export function RootShell() {
   const user = useAuthStore((s) => s.user);
   const sessionQuery = useSessionSync();
 
@@ -85,82 +73,15 @@ function RootShell() {
   );
 }
 
-const rootRoute = createRootRoute({
-  component: RootShell
-});
-
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/",
-  beforeLoad: () => {
-    throw redirect({ to: "/dashboard" });
-  }
-});
-
-const dashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/dashboard",
-  component: DashboardPanel
-});
-
-const transactionsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/transactions",
-  component: TransactionsPanel
-});
-
-const movementsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/movements",
-  component: MovementsPanel
-});
-
-const snapshotsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/snapshots",
-  component: SnapshotsPanel
-});
-
-const settingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings",
-  component: SettingsPanel
-});
-
-export const routeTree = rootRoute.addChildren([
-  indexRoute,
-  dashboardRoute,
-  transactionsRoute,
-  movementsRoute,
-  snapshotsRoute,
-  settingsRoute
-]);
-
-const NotFound = () => (
-  <main className="min-h-screen grid place-items-center p-6">
-    <div className="text-center grid gap-2">
-      <h2 className="text-2xl font-semibold">Page not found</h2>
-      <Link to="/dashboard" className="text-sm text-muted-foreground underline">
-        Back to dashboard
-      </Link>
-    </div>
-  </main>
-);
-
-export function createAppRouter(
-  opts: Partial<Parameters<typeof createRouter>[0]> = {}
-) {
-  return createRouter({
-    routeTree,
-    defaultNotFoundComponent: NotFound,
-    ...opts
-  });
-}
-
-export const router = createAppRouter();
-
-declare module "@tanstack/react-router" {
-  interface Register {
-    router: typeof router;
-  }
+export function NotFound() {
+  return (
+    <main className="min-h-screen grid place-items-center p-6">
+      <div className="text-center grid gap-2">
+        <h2 className="text-2xl font-semibold">Page not found</h2>
+        <Link to="/dashboard" className="text-sm text-muted-foreground underline">
+          Back to dashboard
+        </Link>
+      </div>
+    </main>
+  );
 }

@@ -2,14 +2,10 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   redirect
 } from "@tanstack/react-router";
-import { DashboardPanel } from "@/features/dashboard/DashboardPanel";
-import { MovementsPanel } from "@/features/movements/MovementsPanel";
-import { SettingsPanel } from "@/features/settings/SettingsPanel";
-import { SnapshotsPanel } from "@/features/snapshots/SnapshotsPanel";
-import { TransactionsPanel } from "@/features/transactions/TransactionsPanel";
-import { NotFound, RootShell } from "./router";
+import { NotFound, PanelPending, RootShell } from "./router";
 
 const rootRoute = createRootRoute({
   component: RootShell
@@ -26,31 +22,46 @@ const indexRoute = createRoute({
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard",
-  component: DashboardPanel
+  component: lazyRouteComponent(
+    () => import("@/features/dashboard/DashboardPanel"),
+    "DashboardPanel"
+  )
 });
 
 const transactionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/transactions",
-  component: TransactionsPanel
+  component: lazyRouteComponent(
+    () => import("@/features/transactions/TransactionsPanel"),
+    "TransactionsPanel"
+  )
 });
 
 const movementsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/movements",
-  component: MovementsPanel
+  component: lazyRouteComponent(
+    () => import("@/features/movements/MovementsPanel"),
+    "MovementsPanel"
+  )
 });
 
 const snapshotsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/snapshots",
-  component: SnapshotsPanel
+  component: lazyRouteComponent(
+    () => import("@/features/snapshots/SnapshotsPanel"),
+    "SnapshotsPanel"
+  )
 });
 
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
-  component: SettingsPanel
+  component: lazyRouteComponent(
+    () => import("@/features/settings/SettingsPanel"),
+    "SettingsPanel"
+  )
 });
 
 export const routeTree = rootRoute.addChildren([
@@ -68,6 +79,7 @@ export function createAppRouter(
   return createRouter({
     routeTree,
     defaultNotFoundComponent: NotFound,
+    defaultPendingComponent: PanelPending,
     ...opts
   });
 }

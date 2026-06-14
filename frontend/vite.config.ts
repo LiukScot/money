@@ -10,6 +10,12 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src")
     }
   },
+  build: {
+    // Route panels are lazy-loaded; the remaining entry chunk is core
+    // framework code that ships on first paint. Single-user self-hosted
+    // app, so the 500 kB default warning is noise.
+    chunkSizeWarningLimit: 600
+  },
   server: {
     port: 5174,
     host: "0.0.0.0",

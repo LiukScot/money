@@ -91,6 +91,10 @@ authRoutes.post("/login", async (c, next) => {
       console.error("[auth] rehash write failed (login still succeeds):", e);
     }
   }
+  // Intentional: drop every prior session on login. This is a single-user
+  // app, so there are no legitimate concurrent sessions to preserve, and
+  // wiping them avoids leaving zombie sessions behind (e.g. an old device
+  // that never logged out). Not a bug.
   getDrizzle(db).delete(user_sessions).where(eq(user_sessions.user_id, user.id)).run();
   const { sid } = createSession(db, user.id, user.email, env.SESSION_TTL_SECONDS);
   setSessionCookie(c, env, sid);

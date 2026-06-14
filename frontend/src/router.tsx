@@ -73,6 +73,14 @@ export function RootShell() {
   );
 }
 
+export function PanelPending() {
+  return (
+    <div className="grid place-items-center p-6 text-sm text-muted-foreground">
+      loading…
+    </div>
+  );
+}
+
 export function NotFound() {
   return (
     <main className="min-h-screen grid place-items-center p-6">

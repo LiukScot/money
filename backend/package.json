@@ -23,5 +23,9 @@
     "@types/node": "^25.9.2",
     "drizzle-kit": "^0.31.10",
     "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1",
+    "uuid": "^11.1.1"
   }
 }

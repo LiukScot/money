@@ -392,8 +392,8 @@ describe("Logout flow", () => {
     testState.authenticated = true;
     renderApp();
     await screen.findByRole("heading", { name: "Dashboard" });
-    await user.click(screen.getByText("Account"));
-    await user.click(screen.getByRole("button", { name: /log out/i }));
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    await user.click(await screen.findByRole("menuitem", { name: /log out/i }));
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "money" })).toBeInTheDocument();
     });

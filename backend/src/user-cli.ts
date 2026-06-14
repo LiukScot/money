@@ -19,6 +19,76 @@ function required(name: string): string {
   return v;
 }
 
+/**
+ * Resolve the password without forcing it onto the command line, where it
+ * would leak into shell history and the process list (`ps`). Precedence:
+ * CLI_PASSWORD env -> --password arg (kept for backward compat) -> an
+ * interactive prompt with terminal echo disabled. Never logged.
+ */
+async function resolvePassword(): Promise<string> {
+  const fromEnv = process.env.CLI_PASSWORD;
+  if (fromEnv) return fromEnv;
+
+  const fromArg = arg("password");
+  if (fromArg) return fromArg;
+
+  if (!process.stdin.isTTY) {
+    throw new Error(
+      "No password provided. Set CLI_PASSWORD, pass --password=..., or run interactively."
+    );
+  }
+  return promptHidden("Password: ");
+}
+
+function promptHidden(label: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const stdin = process.stdin;
+    const ENTER = ["\n", "\r"];
+    const EOF = "\u0004"; // Ctrl-D
+    const SIGINT = "\u0003"; // Ctrl-C
+    const BACKSPACE = ["\u007f", "\b"]; // DEL, backspace
+    process.stdout.write(label);
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf8");
+
+    let value = "";
+    const onData = (chunk: string) => {
+      for (const ch of chunk) {
+        if (ENTER.includes(ch) || ch === EOF) {
+          cleanup();
+          process.stdout.write("\n");
+          resolve(value);
+          return;
+        }
+        if (ch === SIGINT) {
+          cleanup();
+          process.stdout.write("\n");
+          reject(new Error("Aborted"));
+          return;
+        }
+        if (BACKSPACE.includes(ch)) {
+          value = value.slice(0, -1);
+          continue;
+        }
+        value += ch;
+      }
+    };
+    const onError = (err: Error) => {
+      cleanup();
+      reject(err);
+    };
+    const cleanup = () => {
+      stdin.setRawMode(false);
+      stdin.pause();
+      stdin.removeListener("data", onData);
+      stdin.removeListener("error", onError);
+    };
+    stdin.on("data", onData);
+    stdin.on("error", onError);
+  });
+}
+
 async function main() {
   const db = openDb(dbPath);
   runMigrations(db);
@@ -44,7 +114,7 @@ async function main() {
 
   if (cmd === "create") {
     const email = required("email").trim().toLowerCase();
-    const password = required("password");
+    const password = await resolvePassword();
     const name = arg("name") ?? null;
     const hash = await Bun.password.hash(password, { algorithm: "argon2id" });
     dbo.insert(users).values({ email, password_hash: hash, name }).run();
@@ -55,7 +125,7 @@ async function main() {
 
   if (cmd === "reset-password") {
     const email = required("email").trim().toLowerCase();
-    const password = required("password");
+    const password = await resolvePassword();
     const hash = await Bun.password.hash(password, { algorithm: "argon2id" });
     const result = dbo
       .update(users)

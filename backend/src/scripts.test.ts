@@ -134,6 +134,41 @@ describe("user-cli.ts", () => {
     );
     expect(result.exitCode).not.toBe(0);
   });
+
+  test("create reads password from CLI_PASSWORD env", async () => {
+    const dir = mkTmpDir("mymoney-user-cli-env-");
+    const dbPath = path.join(dir, "test.sqlite");
+    await runScript("migrate.ts", [`--db=${dbPath}`]);
+
+    const create = await runScript(
+      "user-cli.ts",
+      ["create", "--email=env@example.com", "--name=Env"],
+      { DB_PATH: dbPath, CLI_PASSWORD: "EnvPassword123!" }
+    );
+    expect(create.exitCode).toBe(0);
+    expect(create.stdout).toContain("User created");
+
+    const db = new Database(dbPath, { readonly: true });
+    const row = db
+      .query(`SELECT password_hash FROM users WHERE email = ?`)
+      .get("env@example.com") as { password_hash: string };
+    db.close();
+    expect(row.password_hash.length).toBeGreaterThan(0);
+  });
+
+  test("create fails with no password and no TTY", async () => {
+    const dir = mkTmpDir("mymoney-user-cli-nopw-");
+    const dbPath = path.join(dir, "test.sqlite");
+    await runScript("migrate.ts", [`--db=${dbPath}`]);
+
+    const create = await runScript(
+      "user-cli.ts",
+      ["create", "--email=nopw@example.com"],
+      { DB_PATH: dbPath }
+    );
+    expect(create.exitCode).not.toBe(0);
+    expect(create.stderr).toContain("No password provided");
+  });
 });
 
 describe("backup-db.ts + restore-db.ts round-trip", () => {

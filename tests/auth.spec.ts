@@ -26,8 +26,8 @@ test.describe("auth flows", () => {
 
   test("logout returns to login screen", async ({ page }) => {
     await loginUi(page);
-    await page.getByText("Account").click();
-    await page.getByRole("button", { name: /log out/i }).click();
+    await page.getByRole("button", { name: "Account" }).click();
+    await page.getByRole("menuitem", { name: /log out/i }).click();
     await expect(page.getByRole("heading", { name: "money" })).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
   });

@@ -33,6 +33,7 @@ jobs:
         with:
           node-version: 22
       - run: npm --prefix frontend ci
+      - run: npm --prefix frontend run lint
       - run: npm --prefix frontend run build
       - run: npm --prefix frontend test -- --run
 

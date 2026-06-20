@@ -76,7 +76,7 @@ export function cycleRisk(current: RiskLevel | null): RiskLevel {
   return RISK_LEVELS[(idx + 1) % RISK_LEVELS.length]!;
 }
 
+/** Assumes transactions are sorted DESC by txDate (as returned by the API). */
 export function findLastTxDate(transactions: readonly Transaction[]): string | null {
-  // API returns transactions ORDER BY tx_date DESC, so first element has the latest date
   return transactions[0]?.txDate ?? null;
 }

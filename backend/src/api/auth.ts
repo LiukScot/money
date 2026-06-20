@@ -95,13 +95,11 @@ authRoutes.post("/login", async (c, next) => {
   // app, so there are no legitimate concurrent sessions to preserve, and
   // wiping them avoids leaving zombie sessions behind (e.g. an old device
   // that never logged out). Not a bug.
-  let newSid: string;
-  db.transaction(() => {
+  const { sid } = db.transaction(() => {
     getDrizzle(db).delete(user_sessions).where(eq(user_sessions.user_id, user.id)).run();
-    const sess = createSession(db, user.id, user.email, env.SESSION_TTL_SECONDS);
-    newSid = sess.sid;
+    return createSession(db, user.id, user.email, env.SESSION_TTL_SECONDS);
   })();
-  setSessionCookie(c, env, newSid!);
+  setSessionCookie(c, env, sid);
   return jsonData(c, { email: user.email, name: user.name ?? null });
 });
 

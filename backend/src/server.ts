@@ -7,6 +7,8 @@ import { user_sessions } from "./db/schema.ts";
 import { createApi } from "./api/index.ts";
 import { applySecurityHeaders } from "./security-headers.ts";
 
+const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
+
 const envSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
   PORT: z.coerce.number().default(8001),
@@ -21,14 +23,14 @@ const envSchema = z.object({
   // box. Internet-facing deployments must serve over HTTPS and set
   // COOKIE_SECURE=true, otherwise the session cookie travels without the
   // Secure flag and can be intercepted.
-  COOKIE_SECURE: z.string().default("false"),
+  COOKIE_SECURE: z.preprocess((v) => String(v ?? "").toLowerCase() === "true", z.boolean()).default(false),
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().default(5),
   LOGIN_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().default(15 * 60)
 });
 
 const env = envSchema.parse(process.env);
 
-if (env.COOKIE_SECURE.toLowerCase() !== "true") {
+if (!env.COOKIE_SECURE) {
   console.warn(
     "⚠️  COOKIE_SECURE is disabled: session cookies are sent without the Secure flag. Use HTTPS and set COOKIE_SECURE=true for internet-facing deployments."
   );
@@ -71,7 +73,7 @@ const server = Bun.serve({
       return api.fetch(req);
     }
 
-    const https = env.COOKIE_SECURE.toLowerCase() === "true";
+    const https = env.COOKIE_SECURE;
     if (req.method !== "GET" && req.method !== "HEAD") {
       const headers = new Headers({ "content-type": "application/json" });
       applySecurityHeaders(headers, https);
@@ -81,7 +83,6 @@ const server = Bun.serve({
       );
     }
 
-    const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
     const staticFile = resolveStaticFile(env.PUBLIC_DIR, url.pathname);
     if (staticFile) {
       const headers = new Headers();

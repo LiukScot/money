@@ -44,6 +44,14 @@ function safeNum(value: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function toIsoDateOrNull(v: unknown): string | null {
+  const s = String(v ?? "").slice(0, 10);
+  if (!ISO_DATE_RE.test(s)) return null;
+  const d = new Date(s);
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s ? s : null;
+}
+
 // reason: legacy JSON shape from external source DB is unknown at compile time
 function readSourceJson(db: Database, name: string): any | null {
   const row = db.query(`SELECT data FROM files WHERE name = ? LIMIT 1`).get(name) as any; // reason: bun:sqlite raw query result has no type info
@@ -131,7 +139,11 @@ function main() {
 
     transactions.forEach((row: any, idx: number) => { // reason: legacy JSON shape, accessed via coercion
       const id = String(row.id ?? `tx-${idx}-${Date.now()}`);
-      const date = String(row.date ?? "").slice(0, 10);
+      const date = toIsoDateOrNull(row.date);
+      if (!date) {
+        console.warn(`[migrate] skipping transaction ${id}: invalid date "${row.date}"`);
+        return;
+      }
       const asset = String(row.asset ?? "");
       const tipo = String(row.tipo ?? row.type ?? "");
       const buyValue = safeNum(row.buyValue, 0);
@@ -144,7 +156,7 @@ function main() {
         .values({
           id,
           user_id: primary.id,
-          tx_date: date,
+          tx_date: date!,
           asset,
           tipo,
           derived_type: derivedType,
@@ -173,12 +185,17 @@ function main() {
 
     monthlySnapshots.forEach((row: any, idx: number) => { // reason: legacy JSON shape, accessed via coercion
       const id = String(row.id ?? `snap-${idx}-${Date.now()}`);
+      const snapshot_date = toIsoDateOrNull(row.date);
+      if (!snapshot_date) {
+        console.warn(`[migrate] skipping snapshot ${id}: invalid date "${row.date}"`);
+        return;
+      }
       targetDbo
         .insert(snapTbl)
         .values({
           id,
           user_id: primary.id,
-          snapshot_date: String(row.date ?? "").slice(0, 10),
+          snapshot_date,
           low_risk: safeNum(row.low, 0),
           medium_risk: safeNum(row.medium, 0),
           high_risk: safeNum(row.high, 0),

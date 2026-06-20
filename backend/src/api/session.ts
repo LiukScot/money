@@ -33,7 +33,7 @@ export function setSessionCookie(c: Context<AppEnv>, env: ApiEnv, sid: string): 
     sameSite: "Strict",
     path: "/",
     maxAge: env.SESSION_TTL_SECONDS,
-    secure: env.COOKIE_SECURE.toLowerCase() === "true"
+    secure: env.COOKIE_SECURE
   });
 }
 
@@ -41,7 +41,7 @@ export function clearSessionCookie(c: Context<AppEnv>, env: ApiEnv): void {
   deleteCookie(c, env.SESSION_COOKIE_NAME, {
     path: "/",
     sameSite: "Strict",
-    secure: env.COOKIE_SECURE.toLowerCase() === "true"
+    secure: env.COOKIE_SECURE
   });
 }
 

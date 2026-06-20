@@ -111,7 +111,6 @@ export const asset_styles = sqliteTable(
   },
   (t) => [
     uniqueIndex("asset_styles_user_asset_unique").on(t.user_id, t.asset),
-    index("idx_asset_style_user").on(t.user_id, t.asset),
   ]
 );
 

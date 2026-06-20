@@ -13,7 +13,7 @@ export const TEST_ENV: ApiEnv = {
   SESSION_COOKIE_NAME: TEST_COOKIE_NAME,
   ALLOWED_ORIGINS: "http://localhost:5174,http://example.test",
   PUBLIC_DIR: "/tmp/nonexistent",
-  COOKIE_SECURE: "false",
+  COOKIE_SECURE: false,
   LOGIN_RATE_LIMIT_MAX: 5,
   LOGIN_RATE_LIMIT_WINDOW_SECONDS: 15 * 60
 };

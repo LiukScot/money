@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 
-const DEFAULT_ASSET_COLOR = DEFAULT_COLOR;
-
 type Props = {
   visibleAssets: AssetStats[];
   stylesMap: StylesMap | undefined;
@@ -111,7 +109,7 @@ export function AssetBlocks({ visibleAssets, stylesMap, onChangeStyle }: Props) 
 }
 
 function normalizeColor(input: string | null | undefined): string {
-  if (!input) return DEFAULT_ASSET_COLOR;
+  if (!input) return DEFAULT_COLOR;
   if (/^#[0-9a-fA-F]{6}$/.test(input)) return input;
-  return DEFAULT_ASSET_COLOR;
+  return DEFAULT_COLOR;
 }

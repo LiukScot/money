@@ -77,11 +77,6 @@ export function cycleRisk(current: RiskLevel | null): RiskLevel {
 }
 
 export function findLastTxDate(transactions: readonly Transaction[]): string | null {
-  if (transactions.length === 0) return null;
-  let latest: string | null = null;
-  for (const row of transactions) {
-    if (!row.txDate) continue;
-    if (!latest || row.txDate > latest) latest = row.txDate;
-  }
-  return latest;
+  // API returns transactions ORDER BY tx_date DESC, so first element has the latest date
+  return transactions[0]?.txDate ?? null;
 }

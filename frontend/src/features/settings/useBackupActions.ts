@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { apiEnvelopeSchema, apiFetch, okSchema } from "@/lib";
+import { apiEnvelopeSchema, apiFetch, okSchema, todayIso } from "@/lib";
 
 function downloadBlob(blob: Blob, filename: string) {
   const a = document.createElement("a");
@@ -9,15 +9,10 @@ function downloadBlob(blob: Blob, filename: string) {
   a.download = filename;
   a.click();
   // Revoke after click is dispatched so the browser has time to start the download.
-  setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  queueMicrotask(() => URL.revokeObjectURL(objectUrl));
 }
 
-function dateStamp(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-// reason: backup payload is arbitrary JSON passed straight to JSON.stringify; shape is validated server-side
-const anySchema = apiEnvelopeSchema(z.any());
+const anySchema = apiEnvelopeSchema(z.any()); // reason: backup payload is arbitrary JSON passed to JSON.stringify; shape validated server-side
 
 export function useBackupActions() {
   const queryClient = useQueryClient();
@@ -26,7 +21,7 @@ export function useBackupActions() {
     const payload = await apiFetch("/api/v1/backup/json", { method: "GET" }, (raw) => anySchema.parse(raw).data);
     downloadBlob(
       new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
-      `money-backup-${dateStamp()}.json`
+      `money-backup-${todayIso()}.json`
     );
   };
 
@@ -48,14 +43,19 @@ export function useBackupActions() {
   const exportXlsx = async () => {
     const res = await fetch("/api/v1/backup/xlsx", { credentials: "include" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    downloadBlob(await res.blob(), `money-export-${dateStamp()}.xlsx`);
+    downloadBlob(await res.blob(), `money-export-${todayIso()}.xlsx`);
   };
 
   const importXlsx = async (file: File) => {
     const form = new FormData();
     form.set("file", file);
     const res = await fetch("/api/v1/backup/xlsx/import", { method: "POST", credentials: "include", body: form });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      let msg = `HTTP ${res.status}`;
+      try { msg = JSON.parse(text)?.error?.message || msg; } catch { /* ignore */ }
+      throw new Error(msg);
+    }
     await queryClient.invalidateQueries();
   };
 

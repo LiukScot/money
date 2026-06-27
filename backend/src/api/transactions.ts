@@ -9,6 +9,14 @@ import type { AppEnv } from "./types.ts";
 import { jsonData, jsonError, validateJson } from "./responses.ts";
 import { readPageBounds } from "./pagination.ts";
 
+function deriveFields(body: ReturnType<typeof txSchema.parse>) {
+  const derivedType = body.derivedType || inferType(body.tipo, body.buyValue, body.pnl);
+  const currentValue = Number.isFinite(body.currentValue)
+    ? Number(body.currentValue)
+    : body.buyValue + body.pnl;
+  return { derivedType, currentValue };
+}
+
 export const transactionRoutes = new Hono<AppEnv>();
 
 transactionRoutes.get("/", (c) => {
@@ -31,10 +39,7 @@ transactionRoutes.post("/", validateJson(txSchema), (c) => {
   const db = c.get("db");
   const user = c.get("user");
   const id = makeId("tx");
-  const derivedType = body.derivedType || inferType(body.tipo, body.buyValue, body.pnl);
-  const currentValue = Number.isFinite(body.currentValue)
-    ? Number(body.currentValue)
-    : body.buyValue + body.pnl;
+  const { derivedType, currentValue } = deriveFields(body);
   getDrizzle(db)
     .insert(transactions)
     .values({
@@ -58,10 +63,7 @@ transactionRoutes.put("/:id", validateJson(txSchema), (c) => {
   const body = c.req.valid("json");
   const db = c.get("db");
   const user = c.get("user");
-  const derivedType = body.derivedType || inferType(body.tipo, body.buyValue, body.pnl);
-  const currentValue = Number.isFinite(body.currentValue)
-    ? Number(body.currentValue)
-    : body.buyValue + body.pnl;
+  const { derivedType, currentValue } = deriveFields(body);
   const result = getDrizzle(db)
     .update(transactions)
     .set({

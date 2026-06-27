@@ -147,7 +147,9 @@ export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
   if (txRows.length > 0) {
-    dbo.insert(transactions).values(txRows).onConflictDoNothing().run();
+    const r = dbo.insert(transactions).values(txRows).onConflictDoNothing().run();
+    const skipped = txRows.length - Number(r.changes);
+    if (skipped > 0) console.warn(`[import] ${skipped} transaction row(s) skipped (duplicate id)`);
   }
 
   const validDirections = new Set(["income", "expense"]);
@@ -167,7 +169,9 @@ export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
   if (mmRows.length > 0) {
-    dbo.insert(monthly_movements).values(mmRows).onConflictDoNothing().run();
+    const r = dbo.insert(monthly_movements).values(mmRows).onConflictDoNothing().run();
+    const skipped = mmRows.length - Number(r.changes);
+    if (skipped > 0) console.warn(`[import] ${skipped} monthly-movement row(s) skipped (duplicate id)`);
   }
 
   const snapRows = payload.monthlySnapshots
@@ -186,7 +190,9 @@ export function applyImport(db: SQLiteDB, userId: number, payload: ImportPayload
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
   if (snapRows.length > 0) {
-    dbo.insert(monthly_snapshots).values(snapRows).onConflictDoNothing().run();
+    const r = dbo.insert(monthly_snapshots).values(snapRows).onConflictDoNothing().run();
+    const skipped = snapRows.length - Number(r.changes);
+    if (skipped > 0) console.warn(`[import] ${skipped} monthly-snapshot row(s) skipped (duplicate id)`);
   }
 
   if (payload.replaceStyles) {

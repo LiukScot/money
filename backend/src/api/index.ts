@@ -3,7 +3,8 @@ import type { SQLiteDB } from "../db.ts";
 import type { ApiEnv } from "../schemas.ts";
 import { createRateLimiter } from "../rate-limit.ts";
 import { authRoutes } from "./auth.ts";
-import { backupRoutes, purgeRoutes } from "./backup.ts";
+import { backupRoutes } from "./backup.ts";
+import { purgeRoutes } from "./purge.ts";
 import { movementRoutes } from "./movements.ts";
 import { originGuard, securityHeaders, sessionGuard } from "./middleware.ts";
 import { prefsRoutes } from "./prefs.ts";
@@ -21,8 +22,7 @@ export type CreateApiOptions = {
 const PUBLIC_AUTH_PATHS = new Set([
   "/api/v1/auth/login",
   "/api/v1/auth/logout",
-  "/api/v1/auth/session",
-  "/api/v1/auth/register"
+  "/api/v1/auth/session"
 ]);
 
 export function createApi(opts: CreateApiOptions) {

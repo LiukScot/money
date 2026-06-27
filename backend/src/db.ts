@@ -46,8 +46,7 @@ function baselineIfNeeded(db: SQLiteDB): void {
     .get();
   if (!usersExists || drizzleMetaExists) return;
   const migrations = readMigrationFiles({ migrationsFolder: MIGRATIONS_FOLDER });
-  const first = migrations[0];
-  if (!first) return;
+  if (migrations.length === 0) return;
   const tx = db.transaction(() => {
     db.exec(
       `CREATE TABLE IF NOT EXISTS __drizzle_migrations (
@@ -56,10 +55,10 @@ function baselineIfNeeded(db: SQLiteDB): void {
         created_at NUMERIC
       )`
     );
-    db.run(`INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)`, [
-      first.hash,
-      Date.now()
-    ]);
+    const now = Date.now();
+    for (const m of migrations) {
+      db.run(`INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)`, [m.hash, now]);
+    }
   });
   tx();
 }

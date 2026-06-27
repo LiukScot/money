@@ -174,6 +174,54 @@ describe("/api/v1/backup/xlsx/import", () => {
   });
 });
 
+describe("/api/v1/backup/xlsx/import — input validation", () => {
+  test("rejects base64 string exceeding size limit (FILE_TOO_LARGE)", async () => {
+    const { ctx, cookie } = await setupAuthed();
+    // 10 MB * 4/3 + 5 bytes exceeds the base64 ceiling.
+    const oversized = "A".repeat(Math.ceil(10 * 1024 * 1024 * 4 / 3) + 5);
+    const res = await apiRequest(ctx.api, "/api/v1/backup/xlsx/import", {
+      method: "POST",
+      cookie,
+      body: { base64: oversized }
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe("FILE_TOO_LARGE");
+  });
+
+  test("rejects base64 of non-XLSX bytes (INVALID_FILE)", async () => {
+    const { ctx, cookie } = await setupAuthed();
+    const garbage = Buffer.from("not an xlsx file").toString("base64");
+    const res = await apiRequest(ctx.api, "/api/v1/backup/xlsx/import", {
+      method: "POST",
+      cookie,
+      body: { base64: garbage }
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe("INVALID_FILE");
+  });
+
+  test("rejects multipart file shorter than 4 bytes (INVALID_FILE)", async () => {
+    const { ctx, cookie } = await setupAuthed();
+    const tinyFile = new File([new Uint8Array([0x50, 0x4b])], "test.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    const form = new FormData();
+    form.append("file", tinyFile);
+    const res = await ctx.api.fetch(
+      new Request("http://test/api/v1/backup/xlsx/import", {
+        method: "POST",
+        headers: { cookie },
+        body: form
+      })
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe("INVALID_FILE");
+  });
+});
+
 describe("/api/v1/data/purge", () => {
   test("POST requires auth", async () => {
     const { ctx } = await setupAuthed();

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { apiFetch, todayIso } from "@/lib";
-import { stylesResponse, txListResponse } from "@/types";
+import { stylesResponse } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthlyRiskChart } from "./MonthlyRiskChart";
 import { SnapshotForm } from "./SnapshotForm";
@@ -10,6 +10,7 @@ import { useSnapshotsQuery } from "./useSnapshotsQuery";
 import { useSnapMutation } from "./useSnapMutation";
 import { useDeleteSnapshot } from "./useDeleteSnapshot";
 import { type SnapFormDefaults } from "./schemas";
+import { useTransactionsQuery } from "../transactions/useTransactionsQuery";
 
 function getSnapDefaults(): SnapFormDefaults {
   return { snapshotDate: todayIso(), liquid: "" };
@@ -20,13 +21,7 @@ export function SnapshotsPanel() {
 
   // Keep tx + styles caches warm so useSnapMutation can derive risk totals
   // and so the Add button only enables once both are ready.
-  const txQuery = useQuery({
-    queryKey: ["transactions"],
-    queryFn: async ({ signal }) =>
-      apiFetch("/api/v1/transactions", { method: "GET", signal }, (raw) =>
-        txListResponse.parse(raw).data
-      )
-  });
+  const txQuery = useTransactionsQuery(true);
   const stylesQuery = useQuery({
     queryKey: ["styles"],
     queryFn: async ({ signal }) =>

@@ -120,6 +120,24 @@ describe("PUT/DELETE /api/v1/monthly-snapshots/:id", () => {
     expect(res.status).toBe(200);
   });
 
+  test("PUT returns 404 when other user tries to update (IDOR)", async () => {
+    const { ctx, cookie } = await setupAuthed();
+    const created = await apiRequest(ctx.api, "/api/v1/monthly-snapshots", {
+      method: "POST",
+      cookie,
+      body: validSnap
+    });
+    const { data } = await created.json();
+    await seedUser(ctx.db, { email: "other@example.com", password: "Password123!" });
+    const otherCookie = await loginRequest(ctx.api, "other@example.com", "Password123!");
+    const res = await apiRequest(ctx.api, `/api/v1/monthly-snapshots/${data.id}`, {
+      method: "PUT",
+      cookie: otherCookie,
+      body: validSnap
+    });
+    expect(res.status).toBe(404);
+  });
+
   test("PUT returns 404 for unknown id", async () => {
     const { ctx, cookie } = await setupAuthed();
     const res = await apiRequest(ctx.api, "/api/v1/monthly-snapshots/ghost", {

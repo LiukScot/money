@@ -73,6 +73,47 @@ describe("POST /api/v1/auth/login rate limit (integration)", () => {
     expect(body.error.code).toBe("RATE_LIMITED");
   });
 
+  test("same rate-limit bucket applies to /change-password", async () => {
+    const ctx = createTestApi();
+    const seeded = await seedUser(ctx.db, { email: "rl2@example.com", password: "Password123!" });
+    // Login first to get a valid session (change-password requires auth via global sessionGuard).
+    const loginRes = await ctx.api.fetch(
+      new Request("http://test/api/v1/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": "10.0.0.99" },
+        body: JSON.stringify({ email: seeded.email, password: seeded.password })
+      })
+    );
+    const sessionCookie = loginRes.headers.get("set-cookie")?.split(";")[0] ?? "";
+
+    // Exhaust the bucket via 5 more login attempts (loginRateLimiter is shared).
+    for (let i = 0; i < 5; i += 1) {
+      await ctx.api.fetch(
+        new Request("http://test/api/v1/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-forwarded-for": "10.0.0.99" },
+          body: JSON.stringify({ email: seeded.email, password: "Wrong!" })
+        })
+      );
+    }
+
+    // change-password from same IP with valid session → rate-limited before inner handler runs.
+    const res = await ctx.api.fetch(
+      new Request("http://test/api/v1/auth/change-password", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "10.0.0.99",
+          cookie: sessionCookie
+        },
+        body: JSON.stringify({ currentPassword: "Wrong!", newPassword: "NewPassword456!" })
+      })
+    );
+    expect(res.status).toBe(429);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("RATE_LIMITED");
+  });
+
   test("different IPs each get their own bucket", async () => {
     const ctx = createTestApi();
     await seedUser(ctx.db, { email: "buckets@example.com", password: "Password123!" });

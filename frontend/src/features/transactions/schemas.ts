@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { todayIso } from "@/lib";
 
 export const TIPO_OPTIONS = [
   "nuovo vincolo",
@@ -37,7 +38,7 @@ export type TxFormDefaults = Omit<TxFormValues, "buyValue" | "pnl"> & {
 };
 
 export const txFormDefaults: TxFormDefaults = {
-  txDate: new Date().toISOString().slice(0, 10),
+  txDate: todayIso(),
   asset: "",
   tipo: "nuovo vincolo",
   buyValue: "",

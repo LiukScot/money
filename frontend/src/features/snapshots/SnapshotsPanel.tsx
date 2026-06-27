@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { apiFetch } from "@/lib";
+import { apiFetch, todayIso } from "@/lib";
 import { stylesResponse, txListResponse } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthlyRiskChart } from "./MonthlyRiskChart";
@@ -11,10 +11,9 @@ import { useSnapMutation } from "./useSnapMutation";
 import { useDeleteSnapshot } from "./useDeleteSnapshot";
 import { type SnapFormDefaults } from "./schemas";
 
-const snapDefaults: SnapFormDefaults = {
-  snapshotDate: new Date().toISOString().slice(0, 10),
-  liquid: ""
-};
+function getSnapDefaults(): SnapFormDefaults {
+  return { snapshotDate: todayIso(), liquid: "" };
+}
 
 export function SnapshotsPanel() {
   const snapQuery = useSnapshotsQuery(true);
@@ -35,11 +34,11 @@ export function SnapshotsPanel() {
   });
 
   const form = useForm<SnapFormDefaults>({
-    defaultValues: { ...snapDefaults }
+    defaultValues: getSnapDefaults()
   });
 
   const snapMutation = useSnapMutation(() => {
-    form.reset({ snapshotDate: new Date().toISOString().slice(0, 10), liquid: "" });
+    form.reset(getSnapDefaults());
   });
   const deleteMutation = useDeleteSnapshot();
 

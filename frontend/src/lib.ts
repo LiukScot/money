@@ -33,6 +33,10 @@ export function formatCurrency(value: number) {
 
 const SHORT_DATE = new Intl.DateTimeFormat("it-IT", { year: "numeric", month: "2-digit", day: "2-digit" });
 
+export function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function formatShortDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const ms = Date.parse(iso);

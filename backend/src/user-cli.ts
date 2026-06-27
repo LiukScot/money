@@ -30,7 +30,10 @@ async function resolvePassword(): Promise<string> {
   if (fromEnv) return fromEnv;
 
   const fromArg = arg("password");
-  if (fromArg) return fromArg;
+  if (fromArg) {
+    console.warn("Warning: --password exposes the password in the process list. Prefer CLI_PASSWORD env or interactive mode.");
+    return fromArg;
+  }
 
   if (!process.stdin.isTTY) {
     throw new Error(
@@ -115,10 +118,11 @@ async function main() {
   if (cmd === "create") {
     const email = required("email").trim().toLowerCase();
     const password = await resolvePassword();
+    if (password.length > 1024) throw new Error("Password too long (max 1024 chars)");
     const name = arg("name") ?? null;
     const hash = await Bun.password.hash(password, { algorithm: "argon2id" });
     dbo.insert(users).values({ email, password_hash: hash, name }).run();
-    console.log(`User created: ${email}`);
+    console.log("User created successfully");
     db.close();
     return;
   }
@@ -126,6 +130,7 @@ async function main() {
   if (cmd === "reset-password") {
     const email = required("email").trim().toLowerCase();
     const password = await resolvePassword();
+    if (password.length > 1024) throw new Error("Password too long (max 1024 chars)");
     const hash = await Bun.password.hash(password, { algorithm: "argon2id" });
     const result = dbo
       .update(users)
@@ -134,7 +139,7 @@ async function main() {
       .returning({ id: users.id })
       .all();
     if (result.length === 0) throw new Error(`User not found: ${email}`);
-    console.log(`Password reset for ${email}`);
+    console.log("Password reset successfully");
     db.close();
     return;
   }
@@ -148,7 +153,7 @@ async function main() {
       .returning({ id: users.id })
       .all();
     if (result.length === 0) throw new Error(`User not found: ${email}`);
-    console.log(`Disabled user: ${email}`);
+    console.log("User disabled successfully");
     db.close();
     return;
   }
@@ -162,7 +167,7 @@ async function main() {
       .returning({ id: users.id })
       .all();
     if (result.length === 0) throw new Error(`User not found: ${email}`);
-    console.log(`Enabled user: ${email}`);
+    console.log("User enabled successfully");
     db.close();
     return;
   }

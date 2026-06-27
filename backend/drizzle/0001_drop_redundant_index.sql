@@ -1,0 +1,1 @@
+DROP INDEX `idx_asset_style_user`;

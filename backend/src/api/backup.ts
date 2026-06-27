@@ -7,6 +7,8 @@ import type { AppEnv } from "./types.ts";
 import { jsonData, jsonError, validateJson } from "./responses.ts";
 
 const MAX_XLSX_BYTES = 10 * 1024 * 1024;
+// base64 inflation is exactly ceil(n * 4/3); +4 accounts for padding
+const MAX_XLSX_BASE64_LENGTH = Math.ceil(MAX_XLSX_BYTES * 4 / 3) + 4;
 
 export const backupRoutes = new Hono<AppEnv>();
 
@@ -29,7 +31,11 @@ backupRoutes.post("/json/import", validateJson(backupImportSchema), (c) => {
       assetColors: body.assetColors ?? {},
       assetRisks: body.assetRisks ?? {},
       preferences: {
-        showZeroAssets: Boolean((body.preferences ?? {}).showZeroAssets ?? false)
+        showZeroAssets: (() => {
+          const raw = (body.preferences ?? {}).showZeroAssets;
+          const s = String(raw ?? "").trim().toLowerCase();
+          return raw === true || raw === 1 || s === "true" || s === "1";
+        })()
       },
       replaceStyles: true,
       replacePrefs: true
@@ -152,6 +158,13 @@ backupRoutes.post("/xlsx/import", async (c) => {
       return jsonError(c, "FILE_TOO_LARGE", "File exceeds 10 MB limit", 400);
     }
     const arr = await file.arrayBuffer();
+    if (arr.byteLength < 4) {
+      return jsonError(c, "INVALID_FILE", "Could not parse file as XLSX", 400);
+    }
+    const magic = new Uint8Array(arr, 0, 4);
+    if (magic[0] !== 0x50 || magic[1] !== 0x4B || magic[2] !== 0x03 || magic[3] !== 0x04) {
+      return jsonError(c, "INVALID_FILE", "Could not parse file as XLSX", 400);
+    }
     try {
       await wb.xlsx.load(arr);
     } catch {
@@ -173,9 +186,15 @@ backupRoutes.post("/xlsx/import", async (c) => {
         400
       );
     }
+    if (payload.base64.length > MAX_XLSX_BASE64_LENGTH) {
+      return jsonError(c, "FILE_TOO_LARGE", "File exceeds 10 MB limit", 400);
+    }
     const rawBytes = Buffer.from(payload.base64, "base64");
     if (rawBytes.byteLength > MAX_XLSX_BYTES) {
       return jsonError(c, "FILE_TOO_LARGE", "File exceeds 10 MB limit", 400);
+    }
+    if (rawBytes[0] !== 0x50 || rawBytes[1] !== 0x4B || rawBytes[2] !== 0x03 || rawBytes[3] !== 0x04) {
+      return jsonError(c, "INVALID_FILE", "Could not parse file as XLSX", 400);
     }
     try {
       await wb.xlsx.load(rawBytes.buffer.slice(rawBytes.byteOffset, rawBytes.byteOffset + rawBytes.byteLength));
@@ -193,6 +212,15 @@ backupRoutes.post("/xlsx/import", async (c) => {
   const transactions = sheetToObjects(txSheet);
   const monthlyMovements = sheetToObjects(mmSheet);
   const monthlySnapshots = sheetToObjects(snapSheet);
+
+  const MAX_IMPORT_ROWS = 50_000;
+  if (
+    transactions.length > MAX_IMPORT_ROWS ||
+    monthlyMovements.length > MAX_IMPORT_ROWS ||
+    monthlySnapshots.length > MAX_IMPORT_ROWS
+  ) {
+    return jsonError(c, "FILE_TOO_LARGE", "Import exceeds row limit (50 000 per sheet)", 400);
+  }
   const styleRows = sheetToObjects(styleSheet);
   const prefRows = sheetToObjects(prefSheet);
 

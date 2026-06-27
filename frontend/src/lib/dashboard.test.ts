@@ -87,8 +87,9 @@ describe("findLastTxDate", () => {
     expect(findLastTxDate([])).toBeNull();
   });
 
-  test("returns max ISO date string", () => {
-    expect(findLastTxDate([tx("A", 1, 0, "2026-01-01"), tx("B", 1, 0, "2026-05-17")])).toBe(
+  test("returns first element date (assumes DESC order from API)", () => {
+    // API returns transactions ORDER BY tx_date DESC, so first element = latest
+    expect(findLastTxDate([tx("B", 1, 0, "2026-05-17"), tx("A", 1, 0, "2026-01-01")])).toBe(
       "2026-05-17"
     );
   });

@@ -11,7 +11,7 @@ import { jsonError } from "./responses.ts";
 export const securityHeaders: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
   const env = c.get("env");
-  applySecurityHeaders(c.res.headers, env.COOKIE_SECURE.toLowerCase() === "true");
+  applySecurityHeaders(c.res.headers, env.COOKIE_SECURE);
 };
 
 export function originGuard(allowedOriginsCsv: string): MiddlewareHandler<AppEnv> {
@@ -82,7 +82,11 @@ export const sessionGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
     return jsonError(c, "UNAUTHORIZED", "Authentication required", 401);
   }
   if (Number(row.expires_at) <= now) {
-    dbo.delete(user_sessions).where(eq(user_sessions.sid, sid)).run();
+    try {
+      dbo.delete(user_sessions).where(eq(user_sessions.sid, sid)).run();
+    } catch (e) {
+      console.error("[sessionGuard] failed to delete expired session:", e);
+    }
     return jsonError(c, "UNAUTHORIZED", "Authentication required", 401);
   }
   if (row.disabled_at) {

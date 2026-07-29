@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npm --prefix backend ci
+      - run: bun install --cwd backend --frozen-lockfile
       - run: npm --prefix backend run typecheck
       - run: npm --prefix backend test
 
@@ -47,7 +47,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npm --prefix backend ci
+      - run: bun install --cwd backend --frozen-lockfile
       - run: npm --prefix frontend ci
       - run: npm --prefix backend run typecheck
       - run: npm --prefix frontend run build

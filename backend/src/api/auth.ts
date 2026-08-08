@@ -42,10 +42,6 @@ function clientIp(c: Context<AppEnv>): string {
 
 export const authRoutes = new Hono<AppEnv>();
 
-authRoutes.post("/register", (c) =>
-  jsonError(c, "SIGNUP_DISABLED", "Signup is disabled", 403)
-);
-
 authRoutes.post("/login", async (c, next) => {
   const decision = c.get("loginRateLimiter").check(clientIp(c));
   if (!decision.allowed) {

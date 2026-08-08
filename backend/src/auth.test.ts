@@ -5,6 +5,7 @@ import {
   extractSessionCookie,
   loginRequest,
   seedUser,
+  setupAuthed,
   TEST_COOKIE_NAME
 } from "./test-helpers.ts";
 
@@ -101,19 +102,6 @@ describe("POST /api/v1/auth/login", () => {
     const ctx = createTestApi();
     const res = await apiRequest(ctx.api, "/api/v1/auth/login", { method: "POST", body: {} });
     expect(res.status).toBe(400);
-  });
-});
-
-describe("POST /api/v1/auth/register", () => {
-  test("returns 403 SIGNUP_DISABLED", async () => {
-    const ctx = createTestApi();
-    const res = await apiRequest(ctx.api, "/api/v1/auth/register", {
-      method: "POST",
-      body: { email: "new@example.com", password: "Password123!" }
-    });
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.error.code).toBe("SIGNUP_DISABLED");
   });
 });
 
@@ -236,6 +224,34 @@ describe("POST /api/v1/auth/change-password", () => {
       body: { email: seeded.email, password: "NewPassword456!" }
     });
     expect(loginRes.status).toBe(200);
+  });
+});
+
+describe("session expiry", () => {
+  test("expired session on protected route returns 401 and deletes the row", async () => {
+    const { ctx, user } = await setupAuthed();
+    ctx.db
+      .query(`INSERT INTO user_sessions (sid, user_id, email, expires_at) VALUES (?,?,?,?)`)
+      .run("expiredsid", user.id, user.email, 1);
+    const res = await apiRequest(ctx.api, "/api/v1/transactions", {
+      cookie: `${TEST_COOKIE_NAME}=expiredsid`
+    });
+    expect(res.status).toBe(401);
+    const row = ctx.db.query(`SELECT * FROM user_sessions WHERE sid=?`).get("expiredsid");
+    expect(row).toBeNull();
+  });
+});
+
+describe("disabled user post-login", () => {
+  test("GET /session returns authenticated=false after user is disabled", async () => {
+    const { ctx, user, cookie } = await setupAuthed();
+    ctx.db
+      .query(`UPDATE users SET disabled_at=? WHERE id=?`)
+      .run(new Date().toISOString(), user.id);
+    const res = await apiRequest(ctx.api, "/api/v1/auth/session", { cookie });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.authenticated).toBe(false);
   });
 });
 
